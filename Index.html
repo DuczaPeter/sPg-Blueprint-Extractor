@@ -1,0 +1,2392 @@
+<!doctype html>
+<html lang="hu">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: blob:; connect-src https://api.star-citizen.wiki; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none';" />
+  <title>Star Citizen Blueprint Log Extractor + Recept anyagok</title>
+  <style>
+    :root {
+      --bg: #071017;
+      --panel: #0d1b26;
+      --panel2: #112536;
+      --text: #d9f6ff;
+      --muted: #8fb0bf;
+      --accent: #00d1ff;
+      --good: #56ffb6;
+      --warn: #ffd166;
+      --bad: #ff5d7a;
+      --line: rgba(255,255,255,.10);
+      --shadow: 0 20px 60px rgba(0,0,0,.35);
+      --radius: 18px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--sans);
+      color: var(--text);
+      background:
+        radial-gradient(circle at 15% 0%, rgba(0, 209, 255, .16), transparent 30%),
+        radial-gradient(circle at 90% 10%, rgba(86, 255, 182, .10), transparent 32%),
+        linear-gradient(160deg, #061018 0%, #071017 48%, #03080d 100%);
+    }
+    .wrap { width: min(1800px, calc(100% - 28px)); margin: 0 auto; padding: 26px 0 34px; }
+    header { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; margin-bottom: 18px; }
+    h1 { margin: 0 0 8px; font-size: clamp(26px, 4vw, 44px); letter-spacing: -.04em; line-height: 1; }
+    h2 { margin: 0; font-size: 17px; }
+    .subtitle { color: var(--muted); max-width: 1120px; line-height: 1.45; }
+    .badge { border: 1px solid rgba(86,255,182,.35); color: var(--good); padding: 8px 12px; border-radius: 999px; background: rgba(86,255,182,.07); font-weight: 800; white-space: nowrap; }
+    .grid { display: grid; grid-template-columns: 430px 1fr; gap: 16px; align-items: start; }
+    .stack { display: grid; gap: 16px; }
+    .card { background: linear-gradient(180deg, rgba(17,37,54,.96), rgba(8,20,31,.96)); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+    .card-head { padding: 16px 18px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.035); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .card-body { padding: 18px; }
+    .btns, .toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    button, .file-label {
+      appearance: none;
+      border: 1px solid rgba(0,209,255,.35);
+      color: var(--text);
+      background: rgba(0,209,255,.10);
+      padding: 11px 13px;
+      border-radius: 12px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: .15s ease;
+      font-size: 14px;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    button:hover, .file-label:hover { transform: translateY(-1px); border-color: rgba(86,255,182,.55); }
+    button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+    button.secondary, .file-label.secondary { background: rgba(255,255,255,.045); border-color: var(--line); }
+    button.good { background: rgba(86,255,182,.10); border-color: rgba(86,255,182,.40); }
+    button.warn { background: rgba(255,209,102,.10); border-color: rgba(255,209,102,.45); }
+    button.danger { background: rgba(255,93,122,.10); border-color: rgba(255,93,122,.45); }
+    button.small { padding: 9px 10px; border-radius: 11px; font-size: 13px; }
+    input[type="search"], input[type="text"], select {
+      width: 100%; border: 1px solid var(--line); background: rgba(0,0,0,.22); color: var(--text); padding: 11px 12px; border-radius: 12px; outline: none; font-size: 14px;
+    }
+    input[type="search"] { min-width: 280px; flex: 1 1 360px; }
+    .hidden { display: none !important; }
+    .hint { color: var(--muted); font-size: 13px; line-height: 1.45; }
+    code, .mono { font-family: var(--mono); }
+    code { color: #baf3ff; background: rgba(0,0,0,.22); border: 1px solid var(--line); padding: 1px 5px; border-radius: 6px; }
+    .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 14px 0; }
+    .stat { border: 1px solid var(--line); background: rgba(0,0,0,.18); border-radius: 14px; padding: 12px; }
+    .stat b { display: block; font-size: 24px; color: var(--good); line-height: 1; }
+    .stat span { display: block; margin-top: 5px; color: var(--muted); font-size: 12px; }
+    .progress-wrap { height: 9px; background: rgba(255,255,255,.07); border: 1px solid var(--line); border-radius: 999px; overflow: hidden; margin: 10px 0 12px; }
+    .progress, .api-progress > div { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--good)); transition: width .12s ease; }
+    .api-progress { height: 8px; background: rgba(255,255,255,.07); border-radius: 999px; overflow: hidden; margin-top: 10px; }
+    .ok { color: var(--good); }
+    .warning { color: var(--warn); }
+    .error { color: var(--bad); }
+    .muted { color: var(--muted); }
+    .topline { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .filter-board { border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, rgba(5,17,27,.88), rgba(3,13,22,.82)); padding: 12px; margin: 0 0 12px; }
+    .filter-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+    .filter-grid-panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+    .filter-section { border: 1px solid rgba(66,120,155,.35); background: rgba(2,13,22,.72); border-radius: 14px; padding: 0; box-shadow: inset 0 0 0 1px rgba(255,255,255,.02); overflow: hidden; }
+    .filter-section.filter-section-wide { grid-column: span 2; }
+    .filter-section-summary { list-style: none; cursor: pointer; padding: 12px; user-select: none; }
+    .filter-section-summary::-webkit-details-marker { display: none; }
+    .filter-section-summary::marker { content: ""; }
+    .filter-section-title { color: #cfefff; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: .09em; margin: 0; display: flex; align-items: center; justify-content: space-between; }
+    .filter-section-title::after { content: "▾"; color: var(--muted); font-size: 12px; transition: transform .18s ease; }
+    .filter-section:not([open]) .filter-section-title::after { transform: rotate(-90deg); }
+    .filter-section-body { padding: 0 12px 12px; }
+    .filter-subsection-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+    .filter-subsection { border: 1px solid rgba(66,120,155,.22); border-radius: 12px; padding: 0 10px 10px; flex: 1 1 100%; min-width: 0; }
+    .filter-subsection:not([open]) { flex: 0 0 auto; min-width: 180px; padding-bottom: 0; }
+    .filter-subsection-summary { list-style: none; cursor: pointer; user-select: none; padding: 10px 0 8px; }
+    .filter-subsection-summary::-webkit-details-marker { display: none; }
+    .filter-subsection-summary::marker { content: ""; }
+    .filter-subsection .filter-section-title.secondary { margin-top: 0; padding-top: 0; border-top: 0; }
+    .filter-subsection .filter-section-title.secondary::after { content: "▾"; color: var(--muted); font-size: 12px; transition: transform .18s ease; }
+    .filter-subsection:not([open]) .filter-section-title.secondary::after { transform: rotate(-90deg); }
+    .filter-subsection:not([open]) .filter-chip-wrap { display: none; }
+    @media (max-width: 700px) { .filter-subsection:not([open]) { min-width: 140px; } }
+    .filter-section-title.secondary { margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(66,120,155,.22); }
+    .filter-chip-wrap { display: flex; flex-wrap: wrap; gap: 7px; }
+    .filter-chip { padding: 6px 10px; border-radius: 8px; font-size: 12px; background: rgba(255,255,255,.03); border: 1px solid rgba(66,120,155,.45); color: #e9fbff; }
+    .filter-chip:hover { border-color: rgba(86,255,182,.45); transform: translateY(-1px); }
+    .filter-chip.active { color: #07131a; background: linear-gradient(90deg, var(--accent), var(--good)); border-color: rgba(86,255,182,.68); box-shadow: 0 0 0 1px rgba(255,255,255,.08) inset; }
+    .filter-chip.ship.active { background: linear-gradient(90deg, #48d4ff, #9dffcf); }
+    .filter-chip.warnish.active { background: linear-gradient(90deg, #ffd166, #fff1b7); }
+    .filter-chip.ghost { background: rgba(255,255,255,.02); }
+    .filter-note { color: var(--muted); font-size: 12px; line-height: 1.35; margin-top: 12px; }
+    @media (max-width: 950px) { .filter-section.filter-section-wide { grid-column: span 1; } }
+    .table-wrap { overflow: auto; max-height: 74vh; border: 1px solid var(--line); border-radius: 14px; }
+    table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 1360px; }
+    th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; font-size: 13px; }
+    th { position: sticky; top: 0; z-index: 2; background: #102333; color: #c7f4ff; cursor: pointer; user-select: none; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+    tr:hover td { background: rgba(255,255,255,.025); }
+    .pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 7px; border: 1px solid var(--line); border-radius: 999px; margin: 2px 4px 2px 0; color: #c7f4ff; background: rgba(255,255,255,.045); white-space: nowrap; }
+    .pill.ok { border-color: rgba(86,255,182,.35); background: rgba(86,255,182,.09); color: var(--good); }
+    .pill.warn { border-color: rgba(255,209,102,.35); background: rgba(255,209,102,.09); color: var(--warn); }
+    .pill.bad { border-color: rgba(255,93,122,.35); background: rgba(255,93,122,.09); color: var(--bad); }
+
+    .cat-cell { display: grid; gap: 5px; min-width: 170px; }
+    .cat-badge { display: inline-flex; align-items: center; gap: 7px; width: fit-content; max-width: 100%; padding: 4px 8px; border-radius: 999px; border: 1px solid rgba(0,209,255,.28); background: rgba(0,209,255,.07); color: #dff9ff; font-weight: 900; white-space: nowrap; }
+    .cat-badge.ship { border-color: rgba(86,255,182,.34); background: rgba(86,255,182,.08); }
+    .cat-badge.fps { border-color: rgba(255,209,102,.34); background: rgba(255,209,102,.08); }
+    .cat-meta { color: var(--muted); font-size: 12px; line-height: 1.35; }
+    .cat-meta b { color: var(--good); }
+    .material-list, .use-list { display: grid; gap: 6px; min-width: 280px; }
+    .material-row, .use-row { display: grid; grid-template-columns: minmax(120px, 1fr) auto; gap: 8px; align-items: center; padding: 5px 7px; border: 1px solid rgba(255,255,255,.08); border-radius: 10px; background: rgba(0,0,0,.12); }
+    .use-row { grid-template-columns: minmax(120px, .85fr) minmax(130px, 1fr); }
+    .mat-name { font-weight: 800; color: #e9fbff; }
+    .mat-qty { font-family: var(--mono); color: var(--good); white-space: nowrap; }
+    .use-name { color: #e9fbff; }
+    .use-target { color: var(--warn); font-weight: 800; }
+    .empty { border: 1px dashed rgba(255,255,255,.20); border-radius: 14px; padding: 28px; text-align: center; color: var(--muted); background: rgba(0,0,0,.15); }
+    .logbox { margin-top: 8px; height: 170px; overflow: auto; border: 1px solid var(--line); border-radius: 14px; background: rgba(0,0,0,.25); padding: 10px; font-family: var(--mono); font-size: 12px; line-height: 1.45; white-space: pre-wrap; }
+    details { border: 1px solid var(--line); background: rgba(0,0,0,.12); border-radius: 14px; padding: 10px 12px; }
+    summary { cursor: pointer; font-weight: 800; }
+    ul { margin: 10px 0 0; padding-left: 18px; color: var(--muted); }
+    li { margin: 6px 0; }
+    .box { border: 1px solid var(--line); border-radius: 14px; padding: 12px; background: rgba(0,0,0,.14); }
+    .box label { display: block; color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+    .mini-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .link { color: var(--accent); text-decoration: none; }
+    .link:hover { text-decoration: underline; }
+    .small-note { color: var(--muted); font-size: 12px; margin-top: 5px; }
+
+
+    .bp-detail-panel { border: 1px solid rgba(0,209,255,.22); background: linear-gradient(180deg, rgba(0,209,255,.055), rgba(0,0,0,.12)); border-radius: 15px; padding: 13px; margin: 0 0 12px; }
+    .bp-detail-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+    .bp-detail-title { font-size: 16px; font-weight: 900; color: #e9fbff; }
+    .bp-detail-sub { color: var(--muted); font-size: 12px; margin-top: 3px; }
+    .bp-detail-grid { display: grid; grid-template-columns: minmax(260px, .9fr) minmax(320px, 1.1fr); gap: 10px; }
+    .detail-card { border: 1px solid rgba(255,255,255,.08); border-radius: 12px; background: rgba(0,0,0,.16); padding: 10px; }
+    .detail-card h3 { margin: 0 0 8px; font-size: 13px; letter-spacing: .05em; text-transform: uppercase; color: #c7f4ff; }
+    .kv { display: grid; grid-template-columns: 140px 1fr; gap: 6px 10px; font-size: 13px; }
+    .kv b { color: var(--muted); font-weight: 800; }
+    .quest-list { display: grid; gap: 8px; max-height: 320px; overflow: auto; padding-right: 2px; }
+    .quest-row { border: 1px solid rgba(255,255,255,.09); background: rgba(0,0,0,.18); border-radius: 12px; padding: 9px; }
+    .quest-title { font-weight: 900; color: #e9fbff; }
+    .quest-meta { margin-top: 5px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .quest-meta .warntext { color: var(--warn); font-weight: 800; }
+    .selected-row td { background: rgba(0,209,255,.075) !important; }
+    tbody tr { cursor: pointer; }
+    .inline-list { display: flex; gap: 6px; flex-wrap: wrap; }
+    .bp-detail-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+    @media (max-width: 900px) { .bp-detail-grid { grid-template-columns: 1fr; } .kv { grid-template-columns: 1fr; } }
+
+    .section-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 18px 0 10px; }
+    .section-row h2 { font-size: 16px; }
+    @media (max-width: 1100px) { .grid { grid-template-columns: 1fr; } header { flex-direction: column; } .badge { white-space: normal; } }
+    @media (max-width: 560px) { .wrap { width: min(100% - 16px, 1800px); padding-top: 14px; } .card-body { padding: 13px; } .stats, .mini-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Star Citizen Blueprint Extractor + Recept anyagok</h1>
+        <div class="subtitle">
+          Egyfájlos HTML eszköz a <code>LIVE\logbackups</code> mappából kinyerhető megszerzett blueprintjeidhez. A mappa beolvasása után automatikusan lekéri a Wiki blueprint adatbázist, összeveti a saját találataiddal, megmutatja a kategóriát, ship komponens altípust, Grade / Size adatot, receptanyagokat, és kattintásra külön blueprint / küldetés részletező panelt nyit.
+        </div>
+      </div>
+      <div class="badge">Automata Wiki + kategória + recept + quest</div>
+    </header>
+
+    <div class="grid">
+      <aside class="stack">
+        <section class="card">
+          <div class="card-head"><h2>1. Forrás kiválasztása</h2></div>
+          <div class="card-body">
+            <div class="btns">
+              <button id="pickFolderBtn">Mappa kiválasztása</button>
+              <label class="file-label secondary" for="folderInput">Fallback: mappa/fájlok</label>
+              <input id="folderInput" class="hidden" type="file" webkitdirectory directory multiple accept=".log,.txt" />
+              <button id="clearBtn" class="danger" disabled>Lista ürítése</button>
+            </div>
+            <div class="hint" style="margin-top:14px">
+              Ajánlott mappa:<br>
+              <code>...\Roberts Space Industries\StarCitizen\LIVE\logbackups</code><br><br>
+              A HTML csak olvas. Nem ír bele a Star Citizen mappába, és nem módosít játékfájlt.
+            </div>
+            <div class="stats">
+              <div class="stat"><b id="statFiles">0</b><span>vizsgált fájl</span></div>
+              <div class="stat"><b id="statLines">0</b><span>vizsgált sor</span></div>
+              <div class="stat"><b id="statHits">0</b><span>blueprint találat</span></div>
+              <div class="stat"><b id="statUnique">0</b><span>egyedi blueprint</span></div>
+            </div>
+            <div class="progress-wrap"><div id="progress" class="progress"></div></div>
+            <p id="status" class="muted">Nincs még beolvasott mappa.</p>
+            <details style="margin-top:14px">
+              <summary>Mit keres pontosan?</summary>
+              <ul>
+                <li><code>Received Blueprint: ...:</code> sorokat.</li>
+                <li>Másodlagosan nyers <code>BP_CRAFT_...</code> rekordokat is felismer.</li>
+                <li>Duplikációt név alapján szűr.</li>
+                <li>A régi dátum/sor/fájl oszlopok nem látszanak a fő táblában, mert helyettük a receptanyagok vannak elöl.</li>
+              </ul>
+            </details>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-head"><h2>2. Wiki API és receptadat</h2></div>
+          <div class="card-body">
+            <div class="hint">
+              A program először a publikus blueprint listát tölti le, majd helyben hasonlítja össze a logból kinyert saját listával. Utána a talált blueprint részletes adatlapját is lekéri, hogy legyen anyag / mennyiség / mire kell bontás.
+            </div>
+
+            <label class="box" style="display:flex;gap:10px;align-items:flex-start;margin-top:12px;cursor:pointer">
+              <input id="autoWiki" type="checkbox" checked style="width:auto;margin-top:3px" />
+              <span>
+                <b>Automatikus Wiki összevetés mappaolvasás után</b><br>
+                <span class="hint">Bekapcsolva nem kell külön Wiki gombot nyomni.</span>
+              </span>
+            </label>
+
+            <label class="box" style="display:flex;gap:10px;align-items:flex-start;margin-top:10px;cursor:pointer">
+              <input id="autoDetails" type="checkbox" checked style="width:auto;margin-top:3px" />
+              <span>
+                <b>Automatikus részletes receptadat letöltése</b><br>
+                <span class="hint">Ez tölti be a “mire kell” oszlopot részletesebben. Ha kikapcsolod, csak az alap anyaglista marad.</span>
+              </span>
+            </label>
+
+            <div class="mini-grid" style="margin-top:12px">
+              <div class="box">
+                <label for="apiBase">API alap URL</label>
+                <input id="apiBase" type="text" value="https://api.star-citizen.wiki/api/blueprints" />
+              </div>
+              <div class="box">
+                <label for="apiVersion">Játékverzió, opcionális</label>
+                <input id="apiVersion" type="text" placeholder="pl. 4.8.0-LIVE.11875683" />
+              </div>
+            </div>
+
+            <div class="btns" style="margin-top:12px">
+              <button id="syncWikiBtn" class="warn">Wiki BP kézi frissítés</button>
+              <button id="fetchDetailsBtn" class="good" disabled>Részletes receptadat újratöltés</button>
+              <button id="lookupMissingBtn" class="secondary" disabled>Hiányzók direkt keresése</button>
+            </div>
+            <div class="api-progress"><div id="apiProgress"></div></div>
+            <p id="apiStatus" class="muted">Automatikus Wiki ellenőrzés bekapcsolva.</p>
+
+            <div class="stats">
+              <div class="stat"><b id="statWikiTotal">0</b><span>wiki blueprint</span></div>
+              <div class="stat"><b id="statWikiExact">0</b><span>egyezés</span></div>
+              <div class="stat"><b id="statWikiMaybe">0</b><span>részleges</span></div>
+              <div class="stat"><b id="statDetailLoaded">0</b><span>részletes recept</span></div>
+            </div>
+
+            <details>
+              <summary>Adatvédelmi rész</summary>
+              <ul>
+                <li>A mappaolvasás teljesen helyben történik.</li>
+                <li>A Wiki lista letöltése nem küldi el a saját blueprint listádat, csak publikus API oldalakat kér le.</li>
+                <li>A részletes receptadat letöltése a talált blueprintek UUID-ját kéri le az API-tól.</li>
+                <li>A “Hiányzók direkt keresése” már elküldi a hiányzó blueprint neveket keresőkifejezésként. Ezt külön gombon hagytam.</li>
+              </ul>
+            </details>
+          </div>
+        </section>
+      </aside>
+
+      <main class="card">
+        <div class="card-head"><h2>3. Saját blueprintjeid + recept anyagok</h2></div>
+        <div class="card-body">
+          <div class="topline">
+            <input id="search" type="search" placeholder="Keresés blueprintben, anyagban, slotban, típusban..." />
+            <div class="btns">
+              <button id="copyBtn" class="small secondary" disabled>Lista másolása</button>
+              <button id="csvBtn" class="small good" disabled>CSV</button>
+              <button id="jsonBtn" class="small good" disabled>JSON</button>
+              <button id="saveLocalBtn" class="small secondary" disabled>Helyi mentés</button>
+              <button id="loadLocalBtn" class="small secondary" disabled>Mentés betöltése</button>
+            </div>
+          </div>
+
+          <div id="categoryFilters" class="filter-board">
+            <div class="filter-toolbar">
+              <button class="filter-chip active ghost" data-filter-group="kind" data-filter-value="">Minden</button>
+              <button class="filter-chip ship ghost" data-filter-group="kind" data-filter-value="Ship Component">⚙️ Ship Component</button>
+              <button class="filter-chip ghost" data-filter-group="kind" data-filter-value="Backpack">🎒 Backpack</button>
+              <button class="filter-chip ghost" data-filter-group="kind" data-filter-value="Egyéb">📦 Egyéb</button>
+              <button id="clearFiltersBtn" class="filter-chip ghost" type="button">Szűrők törlése</button>
+            </div>
+
+            <div class="filter-grid-panels">
+              <details class="filter-section" open>
+                <summary class="filter-section-summary"><div class="filter-section-title">FPS Gear</div></summary>
+                <div class="filter-section-body">
+                <div class="filter-chip-wrap">
+                  <button class="filter-chip active" data-filter-group="fpsGroup" data-filter-value="">Mind</button>
+                  <button class="filter-chip warnish" data-filter-group="fpsGroup" data-filter-value="Ammo">Ammo</button>
+                  <button class="filter-chip" data-filter-group="fpsGroup" data-filter-value="Armour">Armour</button>
+                  <button class="filter-chip warnish" data-filter-group="fpsGroup" data-filter-value="Weapons">Weapons</button>
+                </div>
+
+                <div class="filter-section-title secondary">Ammo Type</div>
+                <div class="filter-chip-wrap">
+                  <button class="filter-chip active" data-filter-group="ammoType" data-filter-value="">Mind</button>
+                  <button class="filter-chip warnish" data-filter-group="ammoType" data-filter-value="Ballistic">Ballistic</button>
+                  <button class="filter-chip warnish" data-filter-group="ammoType" data-filter-value="Energy">Energy</button>
+                  <button class="filter-chip warnish" data-filter-group="ammoType" data-filter-value="Electron">Electron</button>
+                  <button class="filter-chip warnish" data-filter-group="ammoType" data-filter-value="Laser">Laser</button>
+                </div>
+                </div>
+              </details>
+
+              <details class="filter-section" open>
+                <summary class="filter-section-summary"><div class="filter-section-title">Armor Class</div></summary>
+                <div class="filter-section-body">
+                <div class="filter-chip-wrap">
+                  <button class="filter-chip active" data-filter-group="armorClass" data-filter-value="">Mind</button>
+                  <button class="filter-chip" data-filter-group="armorClass" data-filter-value="Light">Light</button>
+                  <button class="filter-chip" data-filter-group="armorClass" data-filter-value="Medium">Medium</button>
+                  <button class="filter-chip" data-filter-group="armorClass" data-filter-value="Heavy">Heavy</button>
+                </div>
+
+                <div class="filter-section-title secondary">Armor Slot</div>
+                <div class="filter-chip-wrap">
+                  <button class="filter-chip active" data-filter-group="armorSlot" data-filter-value="">Mind</button>
+                  <button class="filter-chip" data-filter-group="armorSlot" data-filter-value="Helmet">Helmet</button>
+                  <button class="filter-chip" data-filter-group="armorSlot" data-filter-value="Torso">Torso</button>
+                  <button class="filter-chip" data-filter-group="armorSlot" data-filter-value="Arms">Arms</button>
+                  <button class="filter-chip" data-filter-group="armorSlot" data-filter-value="Legs">Legs</button>
+                  <button class="filter-chip" data-filter-group="armorSlot" data-filter-value="Backpack">Backpack</button>
+                  <button class="filter-chip" data-filter-group="armorSlot" data-filter-value="Undersuit">Undersuit</button>
+                </div>
+                </div>
+              </details>
+
+              <details class="filter-section filter-section-wide" open>
+                <summary class="filter-section-summary"><div class="filter-section-title">Ship Components</div></summary>
+                <div class="filter-section-body">
+                <div class="filter-chip-wrap">
+                  <button class="filter-chip active ship" data-filter-group="subType" data-filter-value="">Mind</button>
+                  <button class="filter-chip ship" data-filter-group="subType" data-filter-value="Cooler">❄️ Cooler</button>
+                  <button class="filter-chip ship" data-filter-group="subType" data-filter-value="Mining Laser">⛏️ Mining Laser</button>
+                  <button class="filter-chip ship" data-filter-group="subType" data-filter-value="Power Plant">⚡ Power Plant</button>
+                  <button class="filter-chip ship" data-filter-group="subType" data-filter-value="Quantum Drive">🚀 Quantum Drive</button>
+                  <button class="filter-chip ship" data-filter-group="subType" data-filter-value="Radar">📡 Radar</button>
+                  <button class="filter-chip ship" data-filter-group="subType" data-filter-value="Refuelling">⛽ Refuelling</button>
+                  <button class="filter-chip ship" data-filter-group="subType" data-filter-value="Salvage Module">♻️ Salvage</button>
+                  <button class="filter-chip ship" data-filter-group="subType" data-filter-value="Shield Generator">🛡️ Shield</button>
+                  <button class="filter-chip ship" data-filter-group="subType" data-filter-value="Ship Weapon">🗡️ Ship Weapon</button>
+                  <button class="filter-chip ship" data-filter-group="subType" data-filter-value="Tractor Beam">🧲 Tractor Beam</button>
+                  <button class="filter-chip ship" data-filter-group="subType" data-filter-value="Mining Module">🔩 Mining Module</button>
+                  <button class="filter-chip ship" data-filter-group="subType" data-filter-value="Missile Rack">🎯 Missile Rack</button>
+                  <button class="filter-chip ship" data-filter-group="subType" data-filter-value="Missile / Torpedo">💥 Missile / Torpedo</button>
+                  <button class="filter-chip ship" data-filter-group="subType" data-filter-value="Turret / Gimbal">🌀 Turret / Gimbal</button>
+                  <button class="filter-chip ship" data-filter-group="subType" data-filter-value="EMP">🔌 EMP</button>
+                  <button class="filter-chip ship" data-filter-group="subType" data-filter-value="QED">🛰️ QED</button>
+                  <button class="filter-chip ship" data-filter-group="subType" data-filter-value="Jump Drive">🌌 Jump Drive</button>
+                  <button class="filter-chip ship" data-filter-group="subType" data-filter-value="Flight Controller">🎛️ Flight Controller</button>
+                  <button class="filter-chip ship" data-filter-group="subType" data-filter-value="Shield Controller">🧩 Shield Controller</button>
+                  <button class="filter-chip ship" data-filter-group="subType" data-filter-value="Countermeasure">✨ Countermeasure</button>
+                  <button class="filter-chip ship" data-filter-group="subType" data-filter-value="Ship Armor">🧱 Ship Armor</button>
+                  <button class="filter-chip ship" data-filter-group="subType" data-filter-value="Paint">🎨 Paint</button>
+                  <button class="filter-chip ship" data-filter-group="subType" data-filter-value="Flair">🏷️ Flair</button>
+                  <button class="filter-chip ship" data-filter-group="subType" data-filter-value="Ship Component">📦 Egyéb komponens</button>
+                </div>
+
+                <div class="filter-subsection-row">
+                  <details class="filter-subsection" open>
+                    <summary class="filter-subsection-summary"><div class="filter-section-title secondary">Component Class</div></summary>
+                    <div class="filter-chip-wrap">
+                      <button class="filter-chip active ship" data-filter-group="compClass" data-filter-value="">Mind</button>
+                      <button class="filter-chip ship" data-filter-group="compClass" data-filter-value="Military">Military</button>
+                      <button class="filter-chip ship" data-filter-group="compClass" data-filter-value="Industrial">Industrial</button>
+                      <button class="filter-chip ship" data-filter-group="compClass" data-filter-value="Stealth">Stealth</button>
+                      <button class="filter-chip ship" data-filter-group="compClass" data-filter-value="Civilian">Civilian</button>
+                      <button class="filter-chip ship" data-filter-group="compClass" data-filter-value="Competition">Competition</button>
+                    </div>
+                  </details>
+
+                  <details class="filter-subsection" open>
+                    <summary class="filter-subsection-summary"><div class="filter-section-title secondary">Grade</div></summary>
+                    <div class="filter-chip-wrap">
+                      <button class="filter-chip active ship" data-filter-group="grade" data-filter-value="">Mind</button>
+                      <button class="filter-chip ship" data-filter-group="grade" data-filter-value="A">A</button>
+                      <button class="filter-chip ship" data-filter-group="grade" data-filter-value="B">B</button>
+                      <button class="filter-chip ship" data-filter-group="grade" data-filter-value="C">C</button>
+                      <button class="filter-chip ship" data-filter-group="grade" data-filter-value="D">D</button>
+                    </div>
+                  </details>
+
+                  <details class="filter-subsection" open>
+                    <summary class="filter-subsection-summary"><div class="filter-section-title secondary">Size</div></summary>
+                    <div class="filter-chip-wrap">
+                      <button class="filter-chip active ship" data-filter-group="size" data-filter-value="">Mind</button>
+                      <button class="filter-chip ship" data-filter-group="size" data-filter-value="S0">0</button>
+                      <button class="filter-chip ship" data-filter-group="size" data-filter-value="S1">1</button>
+                      <button class="filter-chip ship" data-filter-group="size" data-filter-value="S2">2</button>
+                      <button class="filter-chip ship" data-filter-group="size" data-filter-value="S3">3</button>
+                      <button class="filter-chip ship" data-filter-group="size" data-filter-value="S4">4</button>
+                      <button class="filter-chip ship" data-filter-group="size" data-filter-value="S5">5</button>
+                      <button class="filter-chip ship" data-filter-group="size" data-filter-value="S6">6</button>
+                      <button class="filter-chip ship" data-filter-group="size" data-filter-value="Capital">Capital</button>
+                    </div>
+                  </details>
+                </div>
+                </div>
+              </details>
+            </div>
+
+            <div class="filter-note">A ship komponens / grade / size / class szűrő automatikusan Ship Component módra vált. Az armor slot / armor class szűrő Armour módra vált.</div>
+          </div>
+
+          <div id="empty" class="empty">Válaszd ki a logbackups mappát, és itt megjelennek a megtalált blueprintjeid.</div>
+
+          <div id="bpDetailPanel" class="bp-detail-panel hidden">
+            <div class="bp-detail-head">
+              <div>
+                <div id="bpDetailTitle" class="bp-detail-title">Blueprint részletek</div>
+                <div id="bpDetailSub" class="bp-detail-sub">Kattints egy blueprint sorra a táblában.</div>
+              </div>
+              <div class="bp-detail-actions">
+                <button id="fetchMissionDetailsBtn" class="small good" disabled>Küldetés részletek frissítése</button>
+                <button id="closeBpDetailBtn" class="small secondary">Panel bezárása</button>
+              </div>
+            </div>
+            <div id="bpDetailBody" class="bp-detail-grid"></div>
+          </div>
+
+          <div id="tableWrap" class="table-wrap hidden">
+            <table id="resultTable">
+              <thead>
+                <tr>
+                  <th data-sort="name">Blueprint név</th>
+                  <th data-sort="wikiStatus">Wiki</th>
+                  <th data-sort="wikiOutputName">Elkészülő item</th>
+                  <th data-sort="categoryLabel">Kategória</th>
+                  <th data-sort="materialText">Anyagok / mennyiség</th>
+                  <th data-sort="useText">Mire kell</th>
+                  <th data-sort="craftTimeSeconds">Craft idő</th>
+                  <th data-sort="unlockingMissionsCount">Unlock</th>
+                  <th data-sort="count">Log találat</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+
+          <div class="section-row">
+            <h2>Napló</h2>
+            <button id="copyLogBtn" class="small secondary">Napló másolása</button>
+          </div>
+          <div id="runLog" class="logbox"></div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+
+  const els = {
+    pickFolderBtn: document.getElementById("pickFolderBtn"),
+    folderInput: document.getElementById("folderInput"),
+    clearBtn: document.getElementById("clearBtn"),
+    statFiles: document.getElementById("statFiles"),
+    statLines: document.getElementById("statLines"),
+    statHits: document.getElementById("statHits"),
+    statUnique: document.getElementById("statUnique"),
+    progress: document.getElementById("progress"),
+    status: document.getElementById("status"),
+    apiBase: document.getElementById("apiBase"),
+    apiVersion: document.getElementById("apiVersion"),
+    autoWiki: document.getElementById("autoWiki"),
+    autoDetails: document.getElementById("autoDetails"),
+    syncWikiBtn: document.getElementById("syncWikiBtn"),
+    fetchDetailsBtn: document.getElementById("fetchDetailsBtn"),
+    lookupMissingBtn: document.getElementById("lookupMissingBtn"),
+    fetchMissionDetailsBtn: document.getElementById("fetchMissionDetailsBtn"),
+    closeBpDetailBtn: document.getElementById("closeBpDetailBtn"),
+    bpDetailPanel: document.getElementById("bpDetailPanel"),
+    bpDetailTitle: document.getElementById("bpDetailTitle"),
+    bpDetailSub: document.getElementById("bpDetailSub"),
+    bpDetailBody: document.getElementById("bpDetailBody"),
+    apiProgress: document.getElementById("apiProgress"),
+    apiStatus: document.getElementById("apiStatus"),
+    statWikiTotal: document.getElementById("statWikiTotal"),
+    statWikiExact: document.getElementById("statWikiExact"),
+    statWikiMaybe: document.getElementById("statWikiMaybe"),
+    statDetailLoaded: document.getElementById("statDetailLoaded"),
+    search: document.getElementById("search"),
+    categoryFilters: document.getElementById("categoryFilters"),
+    clearFiltersBtn: document.getElementById("clearFiltersBtn"),
+    copyBtn: document.getElementById("copyBtn"),
+    csvBtn: document.getElementById("csvBtn"),
+    jsonBtn: document.getElementById("jsonBtn"),
+    saveLocalBtn: document.getElementById("saveLocalBtn"),
+    loadLocalBtn: document.getElementById("loadLocalBtn"),
+    copyLogBtn: document.getElementById("copyLogBtn"),
+    empty: document.getElementById("empty"),
+    tableWrap: document.getElementById("tableWrap"),
+    tbody: document.querySelector("#resultTable tbody"),
+    runLog: document.getElementById("runLog")
+  };
+
+  let state = {
+    rows: [],
+    filtered: [],
+    sortKey: "name",
+    sortDir: 1,
+    filters: { kind: "", subType: "", grade: "", size: "", compClass: "", armorClass: "", armorSlot: "", ammoType: "", fpsGroup: "" },
+    filesScanned: 0,
+    linesScanned: 0,
+    hits: 0,
+    wikiBlueprints: [],
+    wikiIndex: new Map(),
+    wikiDownloadedAt: "",
+    selectedRowKey: "",
+    missionDetailCache: new Map(),
+    itemDetailCache: new Map(),
+    isBusy: false,
+    apiBusy: false
+  };
+
+  const STORAGE_KEY = "sc_blueprint_extractor_saved_rows_v3";
+  const DETAIL_REQUEST_DELAY_MS = 150;
+  const LIST_PAGE_DELAY_MS = 60;
+  const DETAIL_RENDER_EVERY = 25;
+  const MAX_RAW_LINES_PER_BLUEPRINT = 5;
+  const STREAM_YIELD_EVERY_LINES = 5000;
+
+  function log(msg, cls = "") {
+    const time = new Date().toLocaleTimeString("hu-HU");
+    const line = document.createElement("div");
+    if (cls) line.className = cls;
+    line.textContent = `[${time}] ${msg}`;
+    els.runLog.appendChild(line);
+    els.runLog.scrollTop = els.runLog.scrollHeight;
+  }
+  function setStatus(msg, cls = "muted") { els.status.className = cls; els.status.textContent = msg; }
+  function setApiStatus(msg, cls = "muted") { els.apiStatus.className = cls; els.apiStatus.textContent = msg; }
+  function waitFrame() { return new Promise(r => setTimeout(r, 0)); }
+  function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  function setBusy(busy) {
+    state.isBusy = !!busy;
+    els.pickFolderBtn.disabled = busy;
+    els.folderInput.disabled = busy;
+    els.search.disabled = busy;
+    updateStats();
+  }
+  function setApiBusy(busy) {
+    state.apiBusy = !!busy;
+    updateStats();
+  }
+
+  function updateStats() {
+    els.statFiles.textContent = String(state.filesScanned);
+    els.statLines.textContent = String(state.linesScanned);
+    els.statHits.textContent = String(state.hits);
+    els.statUnique.textContent = String(state.rows.length);
+    const hasRows = state.rows.length > 0;
+    const busy = state.isBusy || state.apiBusy;
+    els.copyBtn.disabled = busy || !hasRows;
+    els.csvBtn.disabled = busy || !hasRows;
+    els.jsonBtn.disabled = busy || !hasRows;
+    els.saveLocalBtn.disabled = busy || !hasRows;
+    const snapshotMeta = updateLocalSnapshotUi();
+    els.loadLocalBtn.disabled = busy || !snapshotMeta;
+    els.clearBtn.disabled = busy || (state.filesScanned === 0 && !hasRows);
+    const exact = state.rows.filter(r => r.wikiStatus === "Egyezés").length;
+    const maybe = state.rows.filter(r => r.wikiStatus === "Részleges").length;
+    const details = state.rows.filter(r => r.wikiDetailLoaded).length;
+    els.statWikiTotal.textContent = String(state.wikiBlueprints.length);
+    els.statWikiExact.textContent = String(exact);
+    els.statWikiMaybe.textContent = String(maybe);
+    els.statDetailLoaded.textContent = String(details);
+    els.syncWikiBtn.disabled = busy;
+    els.fetchDetailsBtn.disabled = busy || !state.rows.some(r => r.wikiUuid);
+    els.lookupMissingBtn.disabled = busy || !state.rows.some(r => r.wikiStatus === "Nincs találat");
+    if (els.fetchMissionDetailsBtn) {
+      const row = getSelectedRow();
+      els.fetchMissionDetailsBtn.disabled = busy || !row || !Array.isArray(row.unlockingMissions) || !row.unlockingMissions.length;
+    }
+  }
+
+  function resetRowsOnly() {
+    state.rows = [];
+    state.filtered = [];
+    state.sortKey = "name";
+    state.sortDir = 1;
+    state.filters = { kind: "", subType: "", grade: "", size: "", compClass: "", armorClass: "", armorSlot: "", ammoType: "", fpsGroup: "" };
+    updateFilterButtons();
+    state.filesScanned = 0;
+    state.linesScanned = 0;
+    state.hits = 0;
+    els.tbody.innerHTML = "";
+    els.empty.classList.remove("hidden");
+    els.empty.textContent = "Válaszd ki a logbackups mappát, és itt megjelennek a megtalált blueprintjeid.";
+    els.tableWrap.classList.add("hidden");
+    if (els.bpDetailPanel) els.bpDetailPanel.classList.add("hidden");
+    if (els.bpDetailBody) els.bpDetailBody.innerHTML = "";
+    state.selectedRowKey = "";
+    els.search.value = "";
+    els.progress.style.width = "0%";
+    setStatus("Nincs még beolvasott mappa.");
+    updateStats();
+  }
+  function resetAll() { resetRowsOnly(); els.runLog.textContent = ""; }
+
+  function isTextLogName(name) {
+    const n = String(name || "").toLowerCase();
+    return n.endsWith(".log") || n.endsWith(".txt");
+  }
+  function normalizeName(name) {
+    return String(name || "")
+      .replace(/\u0000/g, "")
+      .replace(/<[^>]+>/g, "")
+      .replace(/\s+/g, " ")
+      .replace(/^[\'\"\s]+|[\'\"\s]+$/g, "")
+      .replace(/[,:;\s]+$/g, "")
+      .trim();
+  }
+  function normalizeForMatch(name) {
+    return String(name || "")
+      .toLowerCase()
+      .replace(/&/g, " and ")
+      .replace(/\bblueprint\b/g, " ")
+      .replace(/\bcrafting\b/g, " ")
+      .replace(/\brecipe\b/g, " ")
+      .replace(/[^a-z0-9]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+  function niceRawRecord(raw) {
+    let s = normalizeName(raw);
+    s = s.replace(/^CraftingBlueprintRecord\./i, "");
+    s = s.replace(/^BP_CRAFT_/i, "");
+    s = s.replace(/_/g, " ");
+    s = s.replace(/\bS0([1-9])\b/g, "S$1");
+    return normalizeName(s);
+  }
+  function getTimestampFromLine(line) {
+    const iso = line.match(/\b(20\d\d-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z?)\b/);
+    if (iso) return iso[1];
+    const angle = line.match(/^<([^>]+)>/);
+    if (angle) return angle[1];
+    return "";
+  }
+
+  function emptyRecipeFields() {
+    return {
+      wikiStatus: "Nincs ellenőrizve",
+      wikiOutputName: "",
+      wikiType: "",
+      outputUuid: "",
+      outputClassName: "",
+      outputSlug: "",
+      outputLink: "",
+      itemDetailLoaded: false,
+      componentMetaSource: "",
+      categoryKind: "",
+      categorySubType: "",
+      categoryLabel: "",
+      categoryIcon: "📦",
+      componentGrade: "",
+      componentSize: "",
+      componentClass: "",
+      componentMetaText: "",
+      armorClass: "",
+      armorSlot: "",
+      ammoType: "",
+      fpsGroup: "",
+      wikiUuid: "",
+      wikiUrl: "",
+      wikiWebUrl: "",
+      craftTimeSeconds: "",
+      craftTimeLabel: "",
+      unlockingMissionsCount: "",
+      isAvailableByDefault: "",
+      materials: [],
+      uses: [],
+      materialText: "",
+      useText: "",
+      wikiDetailLoaded: false,
+      unlockingMissions: [],
+      unlockingMissionsGrouped: [],
+      missionDetails: [],
+      missionDetailsLoaded: false,
+      missionDetailsLoading: false
+    };
+  }
+
+  function addHit(map, name, sourceType, filePath, lineNo, line) {
+    name = normalizeName(name);
+    if (!name || name.length < 2) return;
+    const key = name.toLowerCase();
+    const ts = getTimestampFromLine(line);
+    const rec = map.get(key) || {
+      name,
+      count: 0,
+      firstSeen: ts || "",
+      lastSeen: ts || "",
+      firstLine: lineNo,
+      lastLine: lineNo,
+      sourceType,
+      files: new Set(),
+      rawLines: [],
+      ...emptyRecipeFields()
+    };
+    rec.count++;
+    rec.lastSeen = ts || rec.lastSeen;
+    rec.lastLine = lineNo;
+    rec.files.add(filePath);
+    if (rec.rawLines.length < MAX_RAW_LINES_PER_BLUEPRINT) rec.rawLines.push({ file: filePath, line: lineNo, text: line.slice(0, 700) });
+    map.set(key, rec);
+    state.hits++;
+  }
+
+  const RECEIVED_BLUEPRINT_RE = /Received\s+Blueprint:\s*(.*?)(?::\s|:$)/i;
+  const RECORD_BLUEPRINT_RE = /(?:CraftingBlueprintRecord\.)?(BP_CRAFT_[A-Za-z0-9_]+)/g;
+
+  function processBlueprintLine(line, filePath, lineNo, map) {
+    if (!/Blueprint|BP_CRAFT/i.test(line)) return;
+    const m = line.match(RECEIVED_BLUEPRINT_RE);
+    if (m && m[1]) {
+      addHit(map, m[1], "Received Blueprint", filePath, lineNo, line);
+      return;
+    }
+    let rm;
+    RECORD_BLUEPRINT_RE.lastIndex = 0;
+    while ((rm = RECORD_BLUEPRINT_RE.exec(line)) !== null) {
+      addHit(map, niceRawRecord(rm[1]), "Raw BP_CRAFT record", filePath, lineNo, line);
+    }
+  }
+
+  function scanTextForBlueprints(text, filePath, map) {
+    // Csak fallback kis/régi fájlkezeléshez. Modern Chrome/Edge alatt a streamelt olvasás fut.
+    const lines = text.split(/\r?\n/);
+    state.linesScanned += lines.length;
+    for (let i = 0; i < lines.length; i++) processBlueprintLine(lines[i], filePath, i + 1, map);
+  }
+
+  async function scanFileForBlueprints(file, filePath, map) {
+    // Memóriakímélő olvasás nagy logokra. Nem tölti be egyszerre az egész fájlt RAM-ba.
+    if (file.stream && window.TextDecoder) {
+      const reader = file.stream().getReader();
+      const decoder = new TextDecoder("utf-8", { fatal: false });
+      let carry = "";
+      let lineNo = 0;
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          carry += decoder.decode(value, { stream: true });
+          const parts = carry.split(/\r?\n/);
+          carry = parts.pop() || "";
+          for (const line of parts) {
+            lineNo++;
+            state.linesScanned++;
+            processBlueprintLine(line, filePath, lineNo, map);
+            if (lineNo % STREAM_YIELD_EVERY_LINES === 0) await waitFrame();
+          }
+          await waitFrame();
+        }
+        carry += decoder.decode();
+        if (carry) {
+          lineNo++;
+          state.linesScanned++;
+          processBlueprintLine(carry, filePath, lineNo, map);
+        }
+      } finally {
+        try { reader.releaseLock(); } catch (_) {}
+      }
+      return;
+    }
+
+    if (file.size > 100 * 1024 * 1024) {
+      log(`Figyelem: ${filePath} nagy fájl (${Math.round(file.size / 1024 / 1024)} MB), de a böngésző nem támogat streamelt olvasást. Chrome/Edge ajánlott.`, "warning");
+    }
+    const text = await file.text();
+    scanTextForBlueprints(text, filePath, map);
+  }
+
+  async function collectFilesFromDirectoryHandle(dirHandle, base = "") {
+    const out = [];
+    for await (const entry of dirHandle.values()) {
+      const p = base ? `${base}/${entry.name}` : entry.name;
+      if (entry.kind === "file") {
+        if (isTextLogName(entry.name)) out.push({ path: p, getFile: () => entry.getFile() });
+      } else if (entry.kind === "directory") {
+        out.push(...await collectFilesFromDirectoryHandle(entry, p));
+      }
+    }
+    return out;
+  }
+  function collectFilesFromInput(fileList) {
+    return Array.from(fileList).filter(f => isTextLogName(f.name)).map(f => ({ path: f.webkitRelativePath || f.name, getFile: async () => f }));
+  }
+
+  async function scanFiles(fileEntries) {
+    resetRowsOnly();
+    setBusy(true);
+    setStatus("Beolvasás folyamatban, memóriakímélő módban...", "warning");
+    log(`${fileEntries.length} log/text fájl találva.`);
+    log("Streaming olvasás aktív: nagy logfájloknál nem töltöm be egyszerre az egész fájlt RAM-ba.", "ok");
+    const found = new Map();
+    const total = fileEntries.length || 1;
+    for (let i = 0; i < fileEntries.length; i++) {
+      const entry = fileEntries[i];
+      try {
+        const file = await entry.getFile();
+        await scanFileForBlueprints(file, entry.path, found);
+        state.filesScanned++;
+        if ((i + 1) % 10 === 0 || i === fileEntries.length - 1) log(`Beolvasva: ${i + 1}/${fileEntries.length} fájl`);
+      } catch (err) {
+        log(`Nem sikerült olvasni: ${entry.path} — ${err.message}`, "error");
+      }
+      els.progress.style.width = `${Math.round(((i + 1) / total) * 100)}%`;
+      updateStats();
+      await waitFrame();
+    }
+    state.rows = Array.from(found.values()).map(r => ({ ...r, files: Array.from(r.files).sort(), rawLines: r.rawLines }));
+    if (state.wikiBlueprints.length) matchRowsWithWiki(false);
+    applyFilterAndRender();
+    updateStats();
+    setBusy(false);
+
+    if (!state.rows.length) {
+      setStatus("Nem találtam 'Received Blueprint' sort ebben a mappában.", "warning");
+      log("Nincs blueprint találat. Ellenőrizd, hogy tényleg a LIVE\\logbackups mappát választottad-e.", "warning");
+      return;
+    }
+
+    setStatus(`Logolvasás kész. ${state.rows.length} egyedi blueprint kinyerve.`, "ok");
+    log(`Kész: ${state.rows.length} egyedi blueprint, ${state.hits} összes találat.`, "ok");
+    if (els.autoWiki.checked) {
+      setStatus("Logolvasás kész. Wiki frissítés + receptanyag lekérés automatikusan indul...", "warning");
+      await syncWikiDatabase({ auto: true });
+    }
+  }
+
+  function apiBaseUrl() {
+    let url = els.apiBase.value.trim() || "https://api.star-citizen.wiki/api/blueprints";
+    return url.replace(/\/+$/, "");
+  }
+  function makeApiUrl(params) {
+    const url = new URL(apiBaseUrl());
+    for (const [k, v] of Object.entries(params || {})) {
+      if (v !== undefined && v !== null && String(v).trim() !== "") url.searchParams.set(k, v);
+    }
+    const version = els.apiVersion.value.trim();
+    if (version) url.searchParams.set("version", version);
+    return url.toString();
+  }
+  function makeBlueprintDetailUrl(uuid) {
+    const url = new URL(`${apiBaseUrl()}/${encodeURIComponent(uuid)}`);
+    const version = els.apiVersion.value.trim();
+    if (version) url.searchParams.set("version", version);
+    return url.toString();
+  }
+
+  function apiRootUrl() {
+    const u = new URL(apiBaseUrl());
+    let path = u.pathname.replace(/\/blueprints\/?$/, "").replace(/\/+$/, "");
+    return `${u.origin}${path || "/api"}`;
+  }
+  function missionSlugFromWebUrl(webUrl) {
+    try {
+      if (!webUrl) return "";
+      const u = new URL(webUrl);
+      const parts = u.pathname.split("/").filter(Boolean);
+      const idx = parts.findIndex(p => p.toLowerCase() === "missions");
+      if (idx >= 0 && parts[idx + 1]) return decodeURIComponent(parts[idx + 1]);
+      return parts.length ? decodeURIComponent(parts[parts.length - 1]) : "";
+    } catch { return ""; }
+  }
+  function makeMissionDetailUrl(mission) {
+    const id = mission.uuid || missionSlugFromWebUrl(mission.web_url) || mission.slug || "";
+    if (!id) return "";
+    const url = new URL(`${apiRootUrl()}/missions/${encodeURIComponent(id)}`);
+    const version = els.apiVersion.value.trim();
+    if (version) url.searchParams.set("version", version);
+    return url.toString();
+  }
+
+  function makeItemDetailUrl(identifier, route = "items") {
+    const id = String(identifier || "").trim();
+    if (!id) return "";
+    const safeRoute = String(route || "items").replace(/^\/+|\/+$/g, "") || "items";
+    const url = new URL(`${apiRootUrl()}/${safeRoute}/${encodeURIComponent(id)}`);
+    const version = els.apiVersion.value.trim();
+    if (version) url.searchParams.set("version", version);
+    return url.toString();
+  }
+
+  function outputIdentifierOf(row) {
+    return row.outputUuid || row.outputClassName || row.wikiOutputName || row.name || "";
+  }
+
+  async function fetchItemDetailByIdentifier(identifier, preferredRoutes = ["items"]) {
+    const id = String(identifier || "").trim();
+    if (!id) return null;
+    const routes = Array.from(new Set([...(preferredRoutes || []), "items", "vehicle-items", "vehicle-weapons"]));
+    const cacheKey = `${routes.join(",")}|${id}`.toLowerCase();
+    if (state.itemDetailCache.has(cacheKey)) return state.itemDetailCache.get(cacheKey);
+
+    let lastErr = null;
+    for (const route of routes) {
+      try {
+        const url = makeItemDetailUrl(id, route);
+        if (!url) continue;
+        const json = await fetchJson(url);
+        const item = json.data || json;
+        if (item && typeof item === "object") {
+          state.itemDetailCache.set(cacheKey, item);
+          return item;
+        }
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+    if (lastErr) throw lastErr;
+    return null;
+  }
+
+  async function fetchJson(url) {
+    const res = await fetch(url, { method: "GET", headers: { "Accept": "application/json" } });
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    return await res.json();
+  }
+
+  function outputNameOf(bp) {
+    const output = bp.output || bp.crafted_item || bp.item || {};
+    return output.name || bp.output_name || bp.name || bp.title || "";
+  }
+  function outputTypeOf(bp) {
+    const output = bp.output || bp.crafted_item || bp.item || {};
+    return output.type_label || output.type || bp.output_type || bp.output_class || "";
+  }
+  function amountLabel(x) {
+    const scu = x.quantity_scu ?? x.scu ?? null;
+    const qty = x.quantity ?? x.amount ?? x.count ?? null;
+    if (scu !== null && scu !== undefined && String(scu) !== "") return `${formatNumber(scu)} SCU`;
+    if (qty !== null && qty !== undefined && String(qty) !== "") return `${formatNumber(qty)} db`;
+    return "?";
+  }
+  function formatNumber(v) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return String(v);
+    if (Math.abs(n) >= 100) return String(Math.round(n * 100) / 100);
+    return String(Math.round(n * 10000) / 10000);
+  }
+  function formatCraftTime(seconds) {
+    if (seconds === "" || seconds === null || seconds === undefined) return "";
+    const n = Number(seconds);
+    if (!Number.isFinite(n)) return `${seconds} mp`;
+    if (n <= 0) return "0 mp";
+    const h = Math.floor(n / 3600);
+    const m = Math.floor((n % 3600) / 60);
+    const s = Math.floor(n % 60);
+    const parts = [];
+    if (h) parts.push(`${h} óra`);
+    if (m) parts.push(`${m} perc`);
+    if (s || !parts.length) parts.push(`${s} mp`);
+    return parts.join(" ");
+  }
+  function craftTimeText(row) {
+    return row.craftTimeLabel || formatCraftTime(row.craftTimeSeconds) || "-";
+  }
+  function ingredientName(x) {
+    const res = x.resource || x.commodity || x.item || x.input || {};
+    return x.name || res.name || x.resource_name || x.commodity_name || x.item_name || x.key || "Ismeretlen";
+  }
+
+
+  function percentText(chance) {
+    if (chance === null || chance === undefined || chance === "") return "ismeretlen esély";
+    const n = Number(chance);
+    if (!Number.isFinite(n)) return String(chance);
+    if (n >= 1) return "Garantált / 100%";
+    return `${formatNumber(n * 100)}%`;
+  }
+  function extractBlueprintMissions(bp) {
+    const direct = Array.isArray(bp.unlocking_missions) ? bp.unlocking_missions : [];
+    if (direct.length) return direct.map(m => ({
+      title: m.title || m.name || m.debug_name || "Ismeretlen küldetés",
+      debug_name: m.debug_name || "",
+      reward_scope: m.reward_scope || "",
+      chance: m.chance ?? "",
+      web_url: m.web_url || "",
+      uuid: m.uuid || "",
+      slug: missionSlugFromWebUrl(m.web_url)
+    }));
+    const grouped = Array.isArray(bp.unlocking_missions_grouped) ? bp.unlocking_missions_grouped : [];
+    const out = [];
+    for (const g of grouped) {
+      for (const m of (Array.isArray(g.missions) ? g.missions : [])) out.push({
+        title: m.title || "Ismeretlen küldetés",
+        debug_name: m.debug_name || "",
+        reward_scope: m.reward_scope || "",
+        chance: g.chance ?? m.chance ?? "",
+        chance_label: g.label || "",
+        count: m.count ?? "",
+        web_url: m.web_url || "",
+        uuid: m.uuid || "",
+        slug: missionSlugFromWebUrl(m.web_url)
+      });
+    }
+    return out;
+  }
+  function normalizeMissionDetail(mission, sourceMission = {}) {
+    const m = mission || {};
+    const locGroups = Array.isArray(m.starmap_locations) ? m.starmap_locations : [];
+    const locations = [];
+    for (const g of locGroups) {
+      for (const loc of (Array.isArray(g.locations) ? g.locations : [])) {
+        const name = [loc.name, loc.system].filter(Boolean).join(" / ");
+        if (name) locations.push(`${g.purpose || "Hely"}: ${name}`);
+      }
+    }
+    const prereq = [];
+    const minStanding = m.min_standing || null;
+    if (minStanding && (minStanding.name || minStanding.min_reputation !== null)) prereq.push(`Min. standing: ${minStanding.name || "?"}${minStanding.min_reputation !== null && minStanding.min_reputation !== undefined ? ` (${minStanding.min_reputation})` : ""}`);
+    if (m.min_crime_stat !== null && m.min_crime_stat !== undefined) prereq.push(`Min. CrimeStat: ${m.min_crime_stat}`);
+    if (m.max_crime_stat !== null && m.max_crime_stat !== undefined) prereq.push(`Max. CrimeStat: ${m.max_crime_stat}`);
+    if (m.cost !== null && m.cost !== undefined) prereq.push(`Belépési költség: ${m.cost} aUEC`);
+    if (Array.isArray(m.prerequisite_groups) && m.prerequisite_groups.length) {
+      for (const pg of m.prerequisite_groups) {
+        const tags = [];
+        for (const t of (pg.required_tags || [])) if (t.name) tags.push(t.name);
+        for (const linked of (pg.missions || [])) if (linked.title) tags.push(`Küldetés: ${linked.title}`);
+        if (tags.length) prereq.push(`Előfeltétel: ${tags.join(" / ")}`);
+      }
+    }
+    const rep = [];
+    for (const r of (Array.isArray(m.reputation_gained) ? m.reputation_gained : [])) {
+      rep.push(`${r.faction || "Repu"}${r.scope ? ` / ${r.scope}` : ""}${r.tier ? ` / ${r.tier}` : ""}${r.amount !== null && r.amount !== undefined ? `: +${r.amount}` : ""}`);
+    }
+    return {
+      title: m.title || sourceMission.title || "Ismeretlen küldetés",
+      mission_type: m.mission_type || sourceMission.reward_scope || "",
+      mission_giver: m.mission_giver || "",
+      faction: m.faction && m.faction.name ? m.faction.name : "",
+      reward_scope: m.reward_scope || sourceMission.reward_scope || "",
+      rank_index: m.rank_index ?? "",
+      star_systems: Array.isArray(m.star_systems) ? m.star_systems.filter(Boolean) : [],
+      locations,
+      prerequisites: prereq,
+      reputation_gained: rep,
+      illegal: m.illegal,
+      shareable: m.shareable,
+      reward_min: m.reward_min,
+      reward_max: m.reward_max,
+      reward_currency: m.reward_currency || "aUEC",
+      web_url: m.web_url || sourceMission.web_url || "",
+      link: m.link || ""
+    };
+  }
+
+  function extractSummaryIngredients(bp) {
+    const ingredients = Array.isArray(bp.ingredients) ? bp.ingredients : [];
+    return ingredients.map(x => ({
+      name: ingredientName(x),
+      amount: amountLabel(x),
+      use: "Alapanyag",
+      kind: x.kind || "",
+      minQuality: x.min_quality ?? "",
+      webUrl: x.web_url || x.link || ""
+    })).filter(x => x.name && x.name !== "Ismeretlen");
+  }
+
+  function pushRequirementMaterial(list, node, path) {
+    const kind = node.kind || "";
+    const name = node.name || node.key || "";
+    const isMat = kind === "resource" || kind === "item" || node.quantity_scu !== undefined || node.quantity !== undefined;
+    if (isMat && name) {
+      list.push({
+        name,
+        amount: amountLabel(node),
+        use: path.filter(Boolean).join(" / ") || "Alapanyag",
+        kind,
+        minQuality: node.min_quality ?? "",
+        webUrl: node.web_url || node.link || ""
+      });
+    }
+    const children = Array.isArray(node.children) ? node.children : [];
+    const nextPath = (!isMat && name) ? [...path, name] : path;
+    for (const child of children) pushRequirementMaterial(list, child, nextPath);
+  }
+
+  function extractDetailedMaterials(bp) {
+    const out = [];
+    const groups = Array.isArray(bp.requirement_groups) ? bp.requirement_groups : [];
+    for (const g of groups) {
+      const groupName = g.display_name || g.name || g.key || "Csoport";
+      const children = Array.isArray(g.children) ? g.children : [];
+      for (const child of children) pushRequirementMaterial(out, child, [groupName]);
+    }
+
+    if (!out.length && Array.isArray(bp.tiers) && bp.tiers.length) {
+      const req = bp.tiers[0] && bp.tiers[0].requirements;
+      if (req) pushRequirementMaterial(out, req, []);
+    }
+
+    const aspects = bp.aspects && Array.isArray(bp.aspects.aspects) ? bp.aspects.aspects : [];
+    for (const a of aspects) {
+      const input = a.input || {};
+      if (!input.name) continue;
+      out.push({
+        name: input.name,
+        amount: amountLabel(input),
+        use: a.name || (a.selection_group && a.selection_group.name) || "Aspect",
+        kind: input.kind || "",
+        minQuality: input.min_quality ?? "",
+        webUrl: input.web_url || ""
+      });
+    }
+
+    return out.length ? dedupeMaterials(out) : extractSummaryIngredients(bp);
+  }
+
+  function dedupeMaterials(list) {
+    const seen = new Set();
+    const out = [];
+    for (const m of list) {
+      const key = [m.name, m.amount, m.use].join("|").toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(m);
+    }
+    return out;
+  }
+
+  function materialText(materials) {
+    return (materials || []).map(m => `${m.name} ${m.amount}`.trim()).join(" | ");
+  }
+  function useText(materials) {
+    return (materials || []).map(m => `${m.name} → ${m.use || "Alapanyag"}`).join(" | ");
+  }
+
+
+  function firstFieldDeep(obj, wantedKeys, maxDepth = 5) {
+    const wanted = new Set(wantedKeys.map(k => String(k).toLowerCase().replace(/[^a-z0-9]/g, "")));
+    const seen = new Set();
+    function walk(node, depth) {
+      if (!node || depth > maxDepth || typeof node !== "object") return "";
+      if (seen.has(node)) return "";
+      seen.add(node);
+      if (Array.isArray(node)) {
+        for (const item of node) {
+          const v = walk(item, depth + 1);
+          if (v !== "") return v;
+        }
+        return "";
+      }
+      for (const [k, v] of Object.entries(node)) {
+        const nk = String(k).toLowerCase().replace(/[^a-z0-9]/g, "");
+        if (wanted.has(nk) && (typeof v === "string" || typeof v === "number" || typeof v === "boolean")) {
+          if (String(v).trim() !== "") return String(v).trim();
+        }
+      }
+      for (const v of Object.values(node)) {
+        const found = walk(v, depth + 1);
+        if (found !== "") return found;
+      }
+      return "";
+    }
+    return walk(obj, 0);
+  }
+
+  function collectCategoryText(bp) {
+    const output = bp.output || bp.crafted_item || bp.item || {};
+    const parts = [
+      bp.name, bp.title, bp.key, bp.type, bp.type_label, bp.category, bp.class_name,
+      output.name, output.type, output.type_label, output.sub_type, output.subtype,
+      output.category, output.class, output.class_label, output.class_name,
+      output.classification, output.classification_label, output.item_type, output.item_type_label,
+      output.item_class, output.component_class, output.component_class_label, output.kind, output.port_name,
+      bp.classification, bp.classification_label, bp.item_type, bp.item_type_label
+    ];
+    const tags = output.tags || bp.tags || [];
+    if (Array.isArray(tags)) for (const t of tags) parts.push(typeof t === "string" ? t : (t.name || t.label || t.key || ""));
+    return parts.filter(v => v !== null && v !== undefined && String(v).trim() !== "").join(" ");
+  }
+
+  function normalizeGrade(raw, contextText = "") {
+    const values = [raw, contextText].filter(v => v !== null && v !== undefined && String(v).trim() !== "").map(v => String(v));
+    const numericMap = { "1": "A", "2": "B", "3": "C", "4": "D", "5": "E", "6": "F", "7": "G" };
+    for (const s0 of values) {
+      const s = s0.trim();
+      const exact = s.match(/^[A-G]$/i);
+      if (exact) return exact[0].toUpperCase();
+      if (numericMap[s]) return numericMap[s];
+      const m = s.match(/\b(?:grade|minőség|quality)\s*[:#-]?\s*([A-G])\b/i)
+        || s.match(/\b([A-G])\s*[- ]?grade\b/i)
+        || s.match(/\b(?:grade|minőség|quality)\s*[:#-]?\s*([1-7])\b/i);
+      if (m) return numericMap[m[1]] || m[1].toUpperCase();
+    }
+    return "";
+  }
+
+  function normalizeSize(raw, contextText = "") {
+    const values = [raw, contextText].filter(Boolean).map(v => String(v));
+    for (const s0 of values) {
+      const s = s0.trim();
+      if (/\bcapital\b/i.test(s)) return "Capital";
+      const sMatch = s.match(/\bS\s*([0-9])\b/i) || s.match(/\bsize\s*[:#-]?\s*([0-9])\b/i) || s.match(/\bvehicle\s*item\s*size\s*([0-9])\b/i);
+      if (sMatch) return `S${sMatch[1]}`;
+      if (/^[0-9]$/.test(s)) return `S${s}`;
+    }
+    return "";
+  }
+
+  function normalizeComponentClass(raw, contextText = "") {
+    const values = [raw, contextText].filter(v => v !== null && v !== undefined && String(v).trim() !== "").map(v => String(v));
+    for (const s0 of values) {
+      const s = s0.trim();
+      const t = normalizeForMatch(s);
+      if (/(^| )military( |$)/.test(t)) return "Military";
+      if (/(^| )competition( |$)/.test(t) || /(^| )racing( |$)/.test(t) || /(^| )performance( |$)/.test(t)) return "Competition";
+      if (/(^| )industrial( |$)/.test(t) || /(^| )industry( |$)/.test(t)) return "Industrial";
+      if (/(^| )civilian( |$)/.test(t) || /(^| )civil( |$)/.test(t)) return "Civilian";
+      if (/(^| )stealth( |$)/.test(t) || /(^| )stealthed( |$)/.test(t)) return "Stealth";
+    }
+    return "";
+  }
+
+  function detectArmorClass(text) {
+    const t = normalizeForMatch(text);
+    if (/(^| )heavy( |$)/.test(t)) return "Heavy";
+    if (/(^| )medium( |$)/.test(t)) return "Medium";
+    if (/(^| )light( |$)/.test(t)) return "Light";
+    return "";
+  }
+
+  function detectArmorSlot(text) {
+    const t = normalizeForMatch(text);
+    const checks = [
+      ["Helmet", ["helmet"]],
+      ["Torso", ["torso", "chest"]],
+      ["Arms", ["arms", "arm", "gauntlet", "shoulder"]],
+      ["Legs", ["legs", "leg", "greaves", "thigh", "shin"]],
+      ["Backpack", ["backpack", "rucksack"]],
+      ["Undersuit", ["undersuit", "under suit"]]
+    ];
+    for (const [label, needles] of checks) {
+      if (needles.some(n => t.includes(n))) return label;
+    }
+    return "";
+  }
+
+  function detectAmmoType(text) {
+    const t = normalizeForMatch(text);
+    if (/(^| )ballistic( |$)/.test(t)) return "Ballistic";
+    if (/(^| )energy( |$)/.test(t)) return "Energy";
+    if (/(^| )electron( |$)/.test(t)) return "Electron";
+    if (/(^| )laser( |$)/.test(t)) return "Laser";
+    return "";
+  }
+
+  function detectComponentSubtype(text) {
+    const t = normalizeForMatch(text);
+    const checks = [
+      ["Power Plant", ["power plant", "powerplant"]],
+      ["Shield Generator", ["shield generator", "shield"]],
+      ["Cooler", ["cooler", "cooling"]],
+      ["Quantum Drive", ["quantum drive", "qdrive", "quantum"]],
+      ["Radar", ["radar"]],
+      ["Refuelling", ["refuel", "refuelling", "refueling", "fuel intake", "fuel scoop", "fuel tank"]],
+      ["Flight Controller", ["flight controller"]],
+      ["Shield Controller", ["shield controller"]],
+      ["Jump Drive", ["jump drive"]],
+      ["Self-Destruct", ["self destruct", "selfdestruct"]],
+      ["Ship Armor", ["ship armor", "vehicle armor", "component armor"]],
+      ["Countermeasure", ["countermeasure", "chaff", "flare"]],
+      ["Ship Weapon", ["ship weapon", "ship weapon gun", "vehicle weapon", "vehicle weapon gun", "hardpoint weapon", "weapon hardpoint", "weapon gun", "ballistic cannon", "laser cannon", "laser repeater", "distortion cannon", "distortion repeater", "scattergun"]],
+      ["Missile Rack", ["missile rack"]],
+      ["Turret / Gimbal", ["turret", "gimbal"]],
+      ["Bomb", ["bomb"]],
+      ["Missile / Torpedo", ["missile", "torpedo"]],
+      ["EMP", [" emp ", "electromagnetic pulse"]],
+      ["QED", [" qed ", "quantum enforcement", "quantum interdiction", "quantum dampener"]],
+      ["Mining Laser", ["mining laser", "mining head", "laser head"]],
+      ["Mining Module", ["mining module", "mining modifier", "mining gadget"]],
+      ["Salvage Module", ["salvage modifier", "salvage", "scraper"]],
+      ["Tractor Beam", ["tractor beam"]],
+      ["Paint", [" paint ", "livery"]],
+      ["Flair", [" flair "]],
+      ["Ship Component", ["vehicle component", "ship component", "component"]]
+    ];
+    const padded = ` ${t} `;
+    for (const [label, needles] of checks) {
+      if (needles.some(n => n.startsWith(" ") || n.endsWith(" ") ? padded.includes(n) : t.includes(n))) return label;
+    }
+    return "";
+  }
+
+  function collectItemCategoryText(item) {
+    const parts = [
+      item.name, item.title, item.slug, item.key, item.class_name,
+      item.type, item.type_label, item.sub_type, item.sub_type_label, item.subtype,
+      item.category, item.category_label, item.class, item.class_label, item.item_class, item.item_class_label,
+      item.component_class, item.component_class_label, item.loadout_class, item.loadout_class_label,
+      item.classification, item.classification_label, item.manufacturer && item.manufacturer.name
+    ];
+    const tags = item.tags || [];
+    if (Array.isArray(tags)) for (const t of tags) parts.push(typeof t === "string" ? t : (t.name || t.label || t.key || ""));
+    return parts.filter(v => v !== null && v !== undefined && String(v).trim() !== "").join(" ");
+  }
+
+  function extractComponentMetaFromItem(item, fallbackText = "") {
+    if (!item || typeof item !== "object") return null;
+    const itemText = `${collectItemCategoryText(item)} ${fallbackText || ""}`.trim();
+    const gradeRaw = firstFieldDeep(item, ["grade", "grade_label", "component_grade", "item_grade", "quality_grade"], 7);
+    const sizeRaw = firstFieldDeep(item, ["size", "size_label", "component_size", "item_size", "vehicle_item_size", "port_size", "item_port_size", "hardpoint_size"], 7);
+    const classRaw = firstFieldDeep(item, ["component_class", "component_class_label", "item_class", "item_class_label", "loadout_class", "loadout_class_label", "class", "class_label", "class_name"], 7);
+    const grade = normalizeGrade(gradeRaw, itemText);
+    const size = normalizeSize(sizeRaw, itemText);
+    const compClass = normalizeComponentClass(classRaw, itemText);
+    const subType = detectComponentSubtype(itemText);
+    const metaParts = [];
+    if (grade) metaParts.push(`Grade ${grade}`);
+    if (size) metaParts.push(size);
+    if (compClass) metaParts.push(compClass);
+    return { grade, size, compClass, subType, metaText: metaParts.join(" · "), text: itemText };
+  }
+
+  function applyComponentMeta(row, meta, sourceLabel = "") {
+    if (!row || !meta) return false;
+    let changed = false;
+    if (meta.subType && (!row.categorySubType || row.categorySubType === "Ship Component" || row.categorySubType === "Egyéb")) {
+      row.categoryKind = "Ship Component";
+      row.categorySubType = meta.subType;
+      row.categoryLabel = `⚙️ ${meta.subType}`;
+      row.categoryIcon = "⚙️";
+      changed = true;
+    }
+    if (meta.grade && row.componentGrade !== meta.grade) { row.componentGrade = meta.grade; changed = true; }
+    if (meta.size && row.componentSize !== meta.size) { row.componentSize = meta.size; changed = true; }
+    if (meta.compClass && row.componentClass !== meta.compClass) { row.componentClass = meta.compClass; changed = true; }
+    const metaText = [row.componentGrade ? `Grade ${row.componentGrade}` : "", row.componentSize || "", row.componentClass || ""].filter(Boolean).join(" · ");
+    if (row.componentMetaText !== metaText) { row.componentMetaText = metaText; changed = true; }
+    if (sourceLabel) row.componentMetaSource = sourceLabel;
+    return changed;
+  }
+
+  async function enrichShipComponentMeta(row) {
+    if (!row || row.categoryKind !== "Ship Component") return false;
+    if (row.componentGrade && row.componentSize && row.componentClass) return true;
+    const identifier = outputIdentifierOf(row);
+    if (!identifier) return false;
+    const preferred = row.categorySubType === "Ship Weapon" ? ["vehicle-weapons", "items"] : ["vehicle-items", "items"];
+    const item = await fetchItemDetailByIdentifier(identifier, preferred);
+    const fallback = [row.name, row.wikiOutputName, row.wikiType, row.categorySubType].filter(Boolean).join(" ");
+    const meta = extractComponentMetaFromItem(item, fallback);
+    const changed = applyComponentMeta(row, meta, "Item detail API");
+    row.itemDetailLoaded = !!item;
+    return changed;
+  }
+
+  function classifyBlueprint(bp) {
+    const text = collectCategoryText(bp);
+    const t = normalizeForMatch(text);
+    const output = bp.output || bp.crafted_item || bp.item || {};
+    const gradeRaw = firstFieldDeep(output, ["grade", "grade_label", "component_grade", "item_grade", "class", "class_label", "item_class", "component_class", "quality_grade"], 4)
+      || firstFieldDeep(bp, ["grade", "grade_label", "component_grade", "item_grade"], 3);
+    const sizeRaw = firstFieldDeep(output, ["size", "size_label", "component_size", "item_size", "vehicle_item_size", "port_size", "item_port_size"], 4)
+      || firstFieldDeep(bp, ["size", "size_label", "component_size", "item_size"], 3);
+    const classRaw = firstFieldDeep(output, ["component_class", "component_class_label", "item_class", "item_class_label", "loadout_class", "loadout_class_label", "class", "class_label", "class_name"], 5)
+      || firstFieldDeep(bp, ["component_class", "component_class_label", "item_class", "item_class_label", "loadout_class", "loadout_class_label", "class", "class_label"], 4);
+    const grade = normalizeGrade(gradeRaw, text);
+    const size = normalizeSize(sizeRaw, text);
+    const compClass = normalizeComponentClass(classRaw, text);
+
+    const componentSubtype = detectComponentSubtype(text);
+    if (componentSubtype) {
+      const metaParts = [];
+      if (grade) metaParts.push(`Grade ${grade}`);
+      if (size) metaParts.push(size);
+      if (compClass) metaParts.push(compClass);
+      return {
+        kind: "Ship Component",
+        subType: componentSubtype,
+        icon: "⚙️",
+        label: `⚙️ ${componentSubtype}`,
+        grade,
+        size,
+        compClass,
+        metaText: metaParts.join(" · "),
+        armorClass: "",
+        armorSlot: "",
+        ammoType: "",
+        fpsGroup: ""
+      };
+    }
+    if (t.includes("backpack") || t.includes("rucksack")) return { kind: "Backpack", subType: "Backpack", icon: "🎒", label: "🎒 Backpack", grade: "", size: "", compClass: "", metaText: "", armorClass: "", armorSlot: "Backpack", ammoType: "", fpsGroup: "Armour" };
+    if (t.includes("magazine") || t.includes(" ammo") || t.includes(" ammunition") || t.includes("fps magazine")) return { kind: "FPS Magazine", subType: "FPS Magazine", icon: "▣", label: "▣ FPS Magazine", grade: "", size: "", compClass: "", metaText: "", armorClass: "", armorSlot: "", ammoType: detectAmmoType(text), fpsGroup: "Ammo" };
+    if (t.includes("personal weapon") || t.includes("fps weapon") || t.includes("rifle") || t.includes("pistol") || t.includes("shotgun") || t.includes("smg") || t.includes("sniper") || t.includes("lmg") || t.includes("railgun")) return { kind: "FPS Weapon", subType: "FPS Weapon", icon: "🔫", label: "🔫 FPS Weapon", grade: "", size: "", compClass: "", metaText: "", armorClass: "", armorSlot: "", ammoType: detectAmmoType(text), fpsGroup: "Weapons" };
+    if (t.includes("armor") || t.includes("helmet") || t.includes("undersuit") || t.includes("chest") || t.includes("arms") || t.includes("legs")) return { kind: "Armor", subType: "Armor", icon: "🛡️", label: "🛡️ Armor", grade: "", size: "", compClass: "", metaText: "", armorClass: detectArmorClass(text), armorSlot: detectArmorSlot(text), ammoType: "", fpsGroup: "Armour" };
+
+    return { kind: "Egyéb", subType: "Egyéb", icon: "📦", label: "📦 Egyéb", grade: "", size: "", compClass: "", metaText: "", armorClass: "", armorSlot: "", ammoType: "", fpsGroup: "" };
+  }
+
+  function renderCategoryCell(row) {
+    const label = row.categoryLabel || "📦 Egyéb";
+    const cls = row.categoryKind === "Ship Component" ? "ship" : (row.categoryKind === "FPS Weapon" || row.categoryKind === "FPS Magazine" ? "fps" : "");
+    const meta = row.componentMetaText || [row.componentGrade ? `Grade ${row.componentGrade}` : "", row.componentSize || "", row.componentClass || ""].filter(Boolean).join(" · ");
+    const raw = row.wikiType && row.wikiType !== row.categorySubType ? row.wikiType : "";
+    return `<div class="cat-cell"><span class="cat-badge ${escapeAttr(cls)}">${escapeHtml(label)}</span>${meta ? `<div class="cat-meta"><b>${escapeHtml(meta)}</b></div>` : ""}${raw ? `<div class="cat-meta">API típus: ${escapeHtml(raw)}</div>` : ""}</div>`;
+  }
+
+  function simplifyBlueprint(bp, detailLoaded = false) {
+    const output = bp.output || bp.crafted_item || bp.item || {};
+    const materials = detailLoaded ? extractDetailedMaterials(bp) : extractSummaryIngredients(bp);
+    const unlockingMissions = detailLoaded ? extractBlueprintMissions(bp) : [];
+    const category = classifyBlueprint(bp);
+    return {
+      uuid: bp.uuid || bp.id || "",
+      key: bp.key || "",
+      outputName: outputNameOf(bp),
+      outputType: outputTypeOf(bp),
+      outputUuid: output.uuid || output.id || bp.output_uuid || bp.output_item_uuid || "",
+      outputClassName: output.class_name || bp.output_class || "",
+      outputSlug: output.slug || "",
+      outputLink: output.link || output.web_url || "",
+      categoryKind: category.kind,
+      categorySubType: category.subType,
+      categoryLabel: category.label,
+      categoryIcon: category.icon,
+      componentGrade: category.grade,
+      componentSize: category.size,
+      componentClass: category.compClass || "",
+      componentMetaText: category.metaText,
+      armorClass: category.armorClass || "",
+      armorSlot: category.armorSlot || "",
+      ammoType: category.ammoType || "",
+      fpsGroup: category.fpsGroup || "",
+      craftTimeSeconds: bp.craft_time_seconds ?? "",
+      craftTimeLabel: bp.craft_time_label || "",
+      unlockingMissionsCount: bp.unlocking_missions_count ?? "",
+      isAvailableByDefault: bp.is_available_by_default ?? "",
+      unlockingMissions,
+      unlockingMissionsGrouped: detailLoaded && Array.isArray(bp.unlocking_missions_grouped) ? bp.unlocking_missions_grouped : [],
+      materials,
+      materialText: materialText(materials),
+      useText: useText(materials),
+      link: bp.link || "",
+      webUrl: bp.web_url || bp.output_item_web_url || "",
+      detailLoaded,
+      raw: bp
+    };
+  }
+
+  function rebuildWikiIndex() {
+    state.wikiIndex = new Map();
+    for (const bp of state.wikiBlueprints) {
+      const simple = simplifyBlueprint(bp, false);
+      const keys = new Set([
+        normalizeForMatch(simple.outputName),
+        normalizeForMatch(`${simple.outputName} blueprint`),
+        normalizeForMatch(bp.name || ""),
+        normalizeForMatch(bp.title || ""),
+        normalizeForMatch(bp.key || "")
+      ].filter(Boolean));
+      for (const key of keys) {
+        if (!state.wikiIndex.has(key)) state.wikiIndex.set(key, []);
+        state.wikiIndex.get(key).push(simple);
+      }
+    }
+  }
+
+  async function syncWikiDatabase(options = {}) {
+    setApiBusy(true);
+    const isAuto = !!options.auto;
+    setApiStatus(isAuto ? "Automatikus Wiki API letöltés indul..." : "Wiki API letöltés indul...", "warning");
+    els.apiProgress.style.width = "0%";
+    log(isAuto ? "Automatikus Wiki összevetés: publikus blueprint adatbázis letöltése indul." : "Wiki API: publikus blueprint adatbázis letöltése indul.");
+    const all = [];
+    let page = 1;
+    let lastPage = null;
+    const pageSize = 200;
+    const maxPages = 200;
+
+    try {
+      while (page <= maxPages) {
+        const url = makeApiUrl({ "page[number]": page, "page[size]": pageSize });
+        const json = await fetchJson(url);
+        const data = Array.isArray(json.data) ? json.data : [];
+        all.push(...data);
+        const meta = json.meta || {};
+        lastPage = Number(meta.last_page || meta.lastPage || meta.total_pages || meta.totalPages || lastPage || 0) || lastPage;
+        const total = Number(meta.total || 0);
+        const progress = lastPage ? Math.min(100, Math.round((page / lastPage) * 100)) : total ? Math.min(95, Math.round((all.length / total) * 100)) : Math.min(95, page * 8);
+        els.apiProgress.style.width = `${progress}%`;
+        setApiStatus(`Wiki API: ${all.length} blueprint letöltve. Oldal: ${page}${lastPage ? "/" + lastPage : ""}.`, "warning");
+        const next = json.links && json.links.next;
+        if (lastPage && page >= lastPage) break;
+        if (!lastPage && !next && data.length < pageSize) break;
+        if (!data.length) break;
+        page++;
+        await wait(LIST_PAGE_DELAY_MS);
+      }
+
+      state.wikiBlueprints = all;
+      state.wikiDownloadedAt = new Date().toISOString();
+      rebuildWikiIndex();
+      els.apiProgress.style.width = "100%";
+      setApiStatus(`Wiki API kész: ${all.length} blueprint letöltve.`, "ok");
+      log(`Wiki API kész: ${all.length} blueprint letöltve.`, "ok");
+      if (state.rows.length) {
+        matchRowsWithWiki(true);
+        if (els.autoDetails.checked) await fetchDetailsForMatchedRows({ auto: true, keepBusy: true, force: false });
+      }
+      setStatus(`Kész. ${state.rows.length} blueprint kinyerve, Wiki szerint összevetve, receptanyagok betöltve.`, "ok");
+      return true;
+    } catch (err) {
+      setApiStatus(`Wiki API hiba: ${err.message}`, "error");
+      setStatus(`A logolvasás kész, de a Wiki API hibára futott.`, "error");
+      log(`Wiki API hiba: ${err.message}`, "error");
+      log("Ha CORS hibát látsz a böngésző konzolban, akkor nyisd meg helyi webszerverről: python -m http.server 8000", "warning");
+      return false;
+    } finally {
+      setApiBusy(false);
+      updateStats();
+      applyFilterAndRender();
+    }
+  }
+
+  function setWikiMatch(row, match, status) {
+    row.wikiStatus = status;
+    row.wikiOutputName = match.outputName || "";
+    row.wikiType = match.outputType || "";
+    row.outputUuid = match.outputUuid || "";
+    row.outputClassName = match.outputClassName || "";
+    row.outputSlug = match.outputSlug || "";
+    row.outputLink = match.outputLink || "";
+    row.categoryKind = match.categoryKind || "";
+    row.categorySubType = match.categorySubType || "";
+    row.categoryLabel = match.categoryLabel || "";
+    row.categoryIcon = match.categoryIcon || "📦";
+    row.componentGrade = match.componentGrade || "";
+    row.componentSize = match.componentSize || "";
+    row.componentClass = match.componentClass || "";
+    row.componentMetaText = match.componentMetaText || "";
+    row.armorClass = match.armorClass || "";
+    row.armorSlot = match.armorSlot || "";
+    row.ammoType = match.ammoType || "";
+    row.fpsGroup = match.fpsGroup || "";
+    row.wikiUuid = match.uuid || "";
+    row.wikiUrl = match.link || (match.uuid ? makeBlueprintDetailUrl(match.uuid) : "");
+    row.wikiWebUrl = match.webUrl || "";
+    row.craftTimeSeconds = match.craftTimeSeconds;
+    row.craftTimeLabel = match.craftTimeLabel || formatCraftTime(match.craftTimeSeconds);
+    row.unlockingMissionsCount = match.unlockingMissionsCount;
+    row.isAvailableByDefault = match.isAvailableByDefault;
+    row.materials = match.materials || [];
+    row.uses = match.materials || [];
+    row.materialText = match.materialText || materialText(row.materials);
+    row.useText = match.useText || useText(row.materials);
+    row.wikiDetailLoaded = !!match.detailLoaded;
+    if (match.detailLoaded) {
+      row.unlockingMissions = Array.isArray(match.unlockingMissions) ? match.unlockingMissions : [];
+      row.unlockingMissionsGrouped = Array.isArray(match.unlockingMissionsGrouped) ? match.unlockingMissionsGrouped : [];
+      row.missionDetailsLoaded = false;
+      row.missionDetails = [];
+    }
+  }
+  function clearWikiMatch(row) {
+    Object.assign(row, emptyRecipeFields(), { wikiStatus: "Nincs találat" });
+  }
+
+  function matchRowsWithWiki(showLog) {
+    if (!state.wikiBlueprints.length) return;
+    const allSimple = state.wikiBlueprints.map(bp => simplifyBlueprint(bp, false));
+    for (const row of state.rows) {
+      const key = normalizeForMatch(row.name);
+      const exact = state.wikiIndex.get(key) || state.wikiIndex.get(normalizeForMatch(`${row.name} blueprint`));
+      if (exact && exact.length) {
+        setWikiMatch(row, exact[0], "Egyezés");
+        continue;
+      }
+      const maybe = allSimple.find(bp => {
+        const a = normalizeForMatch(bp.outputName);
+        return a && key && (a.includes(key) || key.includes(a));
+      });
+      if (maybe) setWikiMatch(row, maybe, "Részleges");
+      else clearWikiMatch(row);
+    }
+    updateStats();
+    applyFilterAndRender();
+    if (showLog) log("Wiki összevetés kész.", "ok");
+  }
+
+  async function fetchDetailsForMatchedRows(options = {}) {
+    const keepBusy = !!options.keepBusy;
+    const force = !!options.force;
+    const targets = state.rows.filter(r => r.wikiUuid && (force || !r.wikiDetailLoaded));
+    if (!targets.length) {
+      log("Nincs új részletes receptadat, amit le kellene kérni.", "warning");
+      return true;
+    }
+    if (!keepBusy) setApiBusy(true);
+    setApiStatus(`Részletes receptadat letöltése: 0/${targets.length}`, "warning");
+    log(`Részletes receptadat letöltése indul: ${targets.length} blueprint.`, "warning");
+    let okCount = 0;
+    try {
+      for (let i = 0; i < targets.length; i++) {
+        const row = targets[i];
+        try {
+          const json = await fetchJson(makeBlueprintDetailUrl(row.wikiUuid));
+          const bp = json.data || json;
+          const simple = simplifyBlueprint(bp, true);
+          setWikiMatch(row, simple, row.wikiStatus === "Részleges" ? "Részleges" : "Egyezés");
+          if (row.categoryKind === "Ship Component") {
+            try {
+              await enrichShipComponentMeta(row);
+            } catch (metaErr) {
+              log(`Komponens osztály/méret/minőség lekérés hiba: ${row.name} — ${metaErr.message}`, "warning");
+            }
+          }
+          okCount++;
+        } catch (err) {
+          log(`Részletes receptadat hiba: ${row.name} — ${err.message}`, "error");
+        }
+        els.apiProgress.style.width = `${Math.round(((i + 1) / targets.length) * 100)}%`;
+        setApiStatus(`Részletes receptadat: ${i + 1}/${targets.length}`, "warning");
+        if ((i + 1) % DETAIL_RENDER_EVERY === 0 || i === targets.length - 1) applyFilterAndRender();
+        await wait(DETAIL_REQUEST_DELAY_MS);
+      }
+      setApiStatus(`Részletes receptadat kész: ${okCount}/${targets.length}.`, "ok");
+      log(`Részletes receptadat kész: ${okCount}/${targets.length}.`, "ok");
+      return true;
+    } finally {
+      if (!keepBusy) setApiBusy(false);
+      updateStats();
+      applyFilterAndRender();
+    }
+  }
+
+  async function lookupMissingDirectly() {
+    const missing = state.rows.filter(r => r.wikiStatus === "Nincs találat");
+    if (!missing.length) return;
+    setApiBusy(true);
+    log(`Direkt keresés indul ${missing.length} hiányzó névre. Ez a neveket elküldi keresőkifejezésként az API-nak.`, "warning");
+    setApiStatus("Hiányzók direkt keresése folyamatban...", "warning");
+    for (let i = 0; i < missing.length; i++) {
+      const row = missing[i];
+      try {
+        const url = makeApiUrl({ "filter[query]": row.name, "page[number]": 1, "page[size]": 10 });
+        const json = await fetchJson(url);
+        const data = Array.isArray(json.data) ? json.data : [];
+        if (data.length) {
+          const simple = data.map(bp => simplifyBlueprint(bp, false));
+          const exact = simple.find(bp => normalizeForMatch(bp.outputName) === normalizeForMatch(row.name));
+          setWikiMatch(row, exact || simple[0], exact ? "Egyezés" : "Részleges");
+        }
+      } catch (err) {
+        log(`Direkt keresési hiba: ${row.name} — ${err.message}`, "error");
+      }
+      els.apiProgress.style.width = `${Math.round(((i + 1) / missing.length) * 100)}%`;
+      setApiStatus(`Direkt keresés: ${i + 1}/${missing.length}`, "warning");
+      await wait(DETAIL_REQUEST_DELAY_MS);
+    }
+    if (els.autoDetails.checked) await fetchDetailsForMatchedRows({ keepBusy: true, force: false });
+    setApiStatus("Direkt keresés kész.", "ok");
+    log("Direkt keresés kész.", "ok");
+    setApiBusy(false);
+    updateStats();
+    applyFilterAndRender();
+  }
+
+
+  function rowKey(row) { return normalizeForMatch(row && row.name ? row.name : ""); }
+  function getSelectedRow() {
+    if (!state.selectedRowKey) return null;
+    return state.rows.find(r => rowKey(r) === state.selectedRowKey) || null;
+  }
+  function selectRow(row) {
+    if (!row) return;
+    state.selectedRowKey = rowKey(row);
+    renderTable();
+    renderBlueprintPanel(row);
+    if (Array.isArray(row.unlockingMissions) && row.unlockingMissions.length && !row.missionDetailsLoaded && !row.missionDetailsLoading) {
+      loadMissionDetailsForRow(row, { silent: true });
+    }
+    updateStats();
+  }
+  function closeBlueprintPanel() {
+    state.selectedRowKey = "";
+    if (els.bpDetailPanel) els.bpDetailPanel.classList.add("hidden");
+    if (els.bpDetailBody) els.bpDetailBody.innerHTML = "";
+    renderTable();
+    updateStats();
+  }
+  function missionCacheKey(m) { return m.uuid || m.slug || missionSlugFromWebUrl(m.web_url) || normalizeForMatch(m.title || m.debug_name || ""); }
+  async function loadMissionDetailsForRow(row, options = {}) {
+    if (!row || !Array.isArray(row.unlockingMissions) || !row.unlockingMissions.length) return false;
+    row.missionDetailsLoading = true;
+    if (!options.silent) log(`Küldetés részletek lekérése: ${row.wikiOutputName || row.name}`, "warning");
+    renderBlueprintPanel(row);
+    updateStats();
+    const details = [];
+    for (const m of row.unlockingMissions) {
+      const key = missionCacheKey(m);
+      try {
+        if (key && state.missionDetailCache.has(key)) {
+          details.push(state.missionDetailCache.get(key));
+          continue;
+        }
+        const url = makeMissionDetailUrl(m);
+        if (!url) {
+          details.push({ ...normalizeMissionDetail(null, m), note: "Ehhez a küldetéshez nincs lekérdezhető API azonosító." });
+          continue;
+        }
+        const json = await fetchJson(url);
+        const detail = normalizeMissionDetail(json.data || json, m);
+        if (key) state.missionDetailCache.set(key, detail);
+        details.push(detail);
+        await wait(DETAIL_REQUEST_DELAY_MS);
+      } catch (err) {
+        details.push({ ...normalizeMissionDetail(null, m), note: `Részletlekérés hiba: ${err.message}` });
+      }
+    }
+    row.missionDetails = details;
+    row.missionDetailsLoaded = true;
+    row.missionDetailsLoading = false;
+    if (!options.silent) log(`Küldetés részletek betöltve: ${details.length}.`, "ok");
+    renderBlueprintPanel(row);
+    updateStats();
+    return true;
+  }
+  function renderMiniMaterials(materials) {
+    if (!materials || !materials.length) return `<span class="muted">Nincs receptanyag adat.</span>`;
+    return `<div class="inline-list">${materials.map(m => `<span class="pill"><b>${escapeHtml(m.name)}</b> ${escapeHtml(m.amount || "?")}${m.use ? ` · ${escapeHtml(m.use)}` : ""}</span>`).join("")}</div>`;
+  }
+  function renderMissionBasicList(row) {
+    const missions = Array.isArray(row.unlockingMissions) ? row.unlockingMissions : [];
+    if (row.isAvailableByDefault === true) return `<div class="quest-row"><div class="quest-title">Alapból elérhető</div><div class="quest-meta">Ehhez a blueprinthez a Wiki szerint nem kell unlock küldetés.</div></div>`;
+    if (!row.wikiDetailLoaded) return `<div class="quest-row"><div class="quest-title">Még nincs részletes Wiki adat</div><div class="quest-meta">A küldetéslista csak részletes blueprint adatból olvasható. Kapcsold be az automatikus részletes receptadat letöltést, vagy nyomd meg a részletes receptadat újratöltést.</div></div>`;
+    if (!missions.length) return `<div class="quest-row"><div class="quest-title">Nincs küldetésadat</div><div class="quest-meta">A Wiki API ennél a blueprintnél nem adott unlocking mission listát.</div></div>`;
+    return missions.map((m, idx) => `
+      <div class="quest-row">
+        <div class="quest-title">${escapeHtml(m.title || "Ismeretlen küldetés")}</div>
+        <div class="quest-meta">
+          Esély: <span class="warntext">${escapeHtml(m.chance_label || percentText(m.chance))}</span>${m.count ? ` · variáns: ×${escapeHtml(m.count)}` : ""}<br>
+          Kategória: ${escapeHtml(m.reward_scope || "-")}${m.web_url ? ` · <a class="link" href="${escapeAttr(m.web_url)}" target="_blank" rel="noopener">Wiki küldetés oldal</a>` : ""}<br>
+          ${row.missionDetails && row.missionDetails[idx] ? renderMissionDetailText(row.missionDetails[idx]) : "Részletek betöltése folyamatban vagy nem elérhető."}
+        </div>
+      </div>`).join("");
+  }
+  function renderMissionDetailText(d) {
+    if (!d) return "";
+    const lines = [];
+    if (d.mission_giver) lines.push(`Feladó / giver: ${escapeHtml(d.mission_giver)}`);
+    if (d.faction) lines.push(`Frakció: ${escapeHtml(d.faction)}`);
+    if (d.star_systems && d.star_systems.length) lines.push(`Rendszer: ${escapeHtml(d.star_systems.join(", "))}`);
+    if (d.locations && d.locations.length) lines.push(`Hely: ${escapeHtml(d.locations.slice(0, 4).join("; "))}${d.locations.length > 4 ? " ..." : ""}`);
+    if (d.rank_index !== "" && d.rank_index !== null && d.rank_index !== undefined) lines.push(`Rank index: ${escapeHtml(d.rank_index)}`);
+    if (d.prerequisites && d.prerequisites.length) lines.push(`Előfeltétel: ${escapeHtml(d.prerequisites.join("; "))}`);
+    else lines.push(`Előfeltétel: nincs adat / nincs jelölve`);
+    if (d.reputation_gained && d.reputation_gained.length) lines.push(`Repu jutalom: ${escapeHtml(d.reputation_gained.join("; "))}`);
+    if (d.reward_min !== null && d.reward_min !== undefined) lines.push(`Pénz: ${escapeHtml(d.reward_min)}${d.reward_max && d.reward_max !== d.reward_min ? `–${escapeHtml(d.reward_max)}` : ""} ${escapeHtml(d.reward_currency || "aUEC")}`);
+    if (d.note) lines.push(`<span class="error">${escapeHtml(d.note)}</span>`);
+    return lines.join("<br>");
+  }
+  function renderBlueprintPanel(row) {
+    if (!els.bpDetailPanel || !els.bpDetailBody) return;
+    if (!row) { closeBlueprintPanel(); return; }
+    els.bpDetailPanel.classList.remove("hidden");
+    els.bpDetailTitle.textContent = row.wikiOutputName || row.name || "Blueprint részletek";
+    els.bpDetailSub.textContent = `${row.wikiStatus || "-"} · ${row.categoryLabel || row.wikiType || "ismeretlen kategória"} · ${row.count || 0} log találat`;
+    const missionStatus = row.missionDetailsLoading ? `<span class="warning">Küldetés részletek töltése...</span>` : row.missionDetailsLoaded ? `<span class="ok">Küldetés részletek betöltve</span>` : `<span class="muted">Küldetés részletek még nincsenek betöltve</span>`;
+    els.bpDetailBody.innerHTML = `
+      <div class="detail-card">
+        <h3>Blueprint adatai</h3>
+        <div class="kv">
+          <b>Logban talált név</b><span>${escapeHtml(row.name || "-")}</span>
+          <b>Elkészülő item</b><span>${escapeHtml(row.wikiOutputName || "-")}</span>
+          <b>Kategória</b><span>${escapeHtml(row.categoryLabel || "-")}</span>
+          <b>Komponens altípus</b><span>${escapeHtml(row.categoryKind === "Ship Component" ? (row.categorySubType || "-") : "-")}</span>
+          <b>Minőség / méret / class</b><span>${escapeHtml(row.componentMetaText || [row.componentGrade ? "Grade " + row.componentGrade : "", row.componentSize || "", row.componentClass || ""].filter(Boolean).join(" · ") || "-")}</span>
+          <b>Komponens class</b><span>${escapeHtml(row.componentClass || "-")}</span>
+          <b>API típus</b><span>${escapeHtml(row.wikiType || "-")}</span>
+          <b>Craft idő</b><span>${escapeHtml(craftTimeText(row))}</span>
+          <b>Unlock küldetés</b><span>${escapeHtml(row.unlockingMissionsCount === "" ? "-" : row.unlockingMissionsCount)}</span>
+          <b>Alapból elérhető</b><span>${row.isAvailableByDefault === true ? "Igen" : row.isAvailableByDefault === false ? "Nem" : "-"}</span>
+          <b>Wiki</b><span>${row.wikiWebUrl ? `<a class="link" href="${escapeAttr(row.wikiWebUrl)}" target="_blank" rel="noopener">Blueprint oldal</a>` : "-"}</span>
+        </div>
+        <h3 style="margin-top:12px">Anyagok</h3>
+        ${renderMiniMaterials(row.materials)}
+      </div>
+      <div class="detail-card">
+        <h3>Melyik quest adja?</h3>
+        <div class="small-note" style="margin-bottom:8px">${missionStatus}. A pontos rendszer / repu / előfeltétel csak akkor látszik, ha a Wiki mission detail API visszaadja.</div>
+        <div class="quest-list">${renderMissionBasicList(row)}</div>
+      </div>`;
+  }
+
+
+  function getLocalSnapshotMeta() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      const snapshot = JSON.parse(raw);
+      if (!snapshot || !Array.isArray(snapshot.rows)) return null;
+      return {
+        savedAt: snapshot.savedAt || "",
+        rowCount: snapshot.rows.length,
+        version: snapshot.version || "?"
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function formatSavedAt(iso) {
+    if (!iso) return "ismeretlen időpont";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleString("hu-HU");
+  }
+
+  function hasLocalSnapshot() {
+    return !!getLocalSnapshotMeta();
+  }
+
+  function updateLocalSnapshotUi() {
+    const meta = getLocalSnapshotMeta();
+    if (!meta) {
+      els.loadLocalBtn.title = "Nincs helyi mentés a böngészőben.";
+      return null;
+    }
+    els.loadLocalBtn.title = `Utolsó helyi mentés: ${formatSavedAt(meta.savedAt)} | ${meta.rowCount} blueprint | mentésverzió: ${meta.version}`;
+    return meta;
+  }
+
+  function makeRowsSnapshot(rows) {
+    return (rows || []).map(r => ({
+      name: r.name,
+      count: r.count,
+      firstSeen: r.firstSeen || "",
+      lastSeen: r.lastSeen || "",
+      firstLine: r.firstLine || "",
+      lastLine: r.lastLine || "",
+      sourceType: r.sourceType || "",
+      files: Array.isArray(r.files) ? r.files : Array.from(r.files || []),
+      wikiStatus: r.wikiStatus || "Nincs ellenőrizve",
+      wikiOutputName: r.wikiOutputName || "",
+      wikiType: r.wikiType || "",
+      outputUuid: r.outputUuid || "",
+      outputClassName: r.outputClassName || "",
+      outputSlug: r.outputSlug || "",
+      outputLink: r.outputLink || "",
+      itemDetailLoaded: !!r.itemDetailLoaded,
+      componentMetaSource: r.componentMetaSource || "",
+      categoryKind: r.categoryKind || "",
+      categorySubType: r.categorySubType || "",
+      categoryLabel: r.categoryLabel || "",
+      categoryIcon: r.categoryIcon || "📦",
+      componentGrade: r.componentGrade || "",
+      componentSize: r.componentSize || "",
+      componentClass: r.componentClass || "",
+      componentMetaText: r.componentMetaText || "",
+      armorClass: r.armorClass || "",
+      armorSlot: r.armorSlot || "",
+      ammoType: r.ammoType || "",
+      fpsGroup: r.fpsGroup || "",
+      wikiUuid: r.wikiUuid || "",
+      wikiUrl: r.wikiUrl || "",
+      wikiWebUrl: r.wikiWebUrl || "",
+      craftTimeSeconds: r.craftTimeSeconds ?? "",
+      craftTimeLabel: r.craftTimeLabel || "",
+      unlockingMissionsCount: r.unlockingMissionsCount ?? "",
+      isAvailableByDefault: r.isAvailableByDefault ?? "",
+      materials: Array.isArray(r.materials) ? r.materials : [],
+      materialText: r.materialText || materialText(r.materials || []),
+      useText: r.useText || useText(r.materials || []),
+      wikiDetailLoaded: !!r.wikiDetailLoaded,
+      unlockingMissions: Array.isArray(r.unlockingMissions) ? r.unlockingMissions : [],
+      unlockingMissionsGrouped: Array.isArray(r.unlockingMissionsGrouped) ? r.unlockingMissionsGrouped : [],
+      missionDetails: Array.isArray(r.missionDetails) ? r.missionDetails : [],
+      missionDetailsLoaded: !!r.missionDetailsLoaded
+    }));
+  }
+
+  function saveLocalSnapshot() {
+    try {
+      const snapshot = {
+        version: 3,
+        savedAt: new Date().toISOString(),
+        filesScanned: state.filesScanned,
+        linesScanned: state.linesScanned,
+        hits: state.hits,
+        wikiDownloadedAt: state.wikiDownloadedAt,
+        rows: makeRowsSnapshot(state.rows)
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+      updateLocalSnapshotUi();
+      log(`Helyi mentés kész: ${snapshot.rows.length} blueprint.`, "ok");
+      updateStats();
+    } catch (err) {
+      log(`Helyi mentés hiba: ${err.message}`, "error");
+    }
+  }
+
+  function loadLocalSnapshot() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) {
+        log("Nincs helyi mentés, amit vissza lehetne tölteni.", "warning");
+        updateStats();
+        return;
+      }
+      const snapshot = JSON.parse(raw);
+      if (!snapshot || !Array.isArray(snapshot.rows)) throw new Error("A mentés formátuma hibás.");
+      state.rows = snapshot.rows.map(r => {
+        const row = {
+          ...emptyRecipeFields(),
+          ...r,
+          files: Array.isArray(r.files) ? r.files : [],
+          rawLines: []
+        };
+        row.materials = Array.isArray(row.materials) ? row.materials : [];
+        row.materialText = row.materialText || materialText(row.materials);
+        row.useText = row.useText || useText(row.materials);
+        row.craftTimeLabel = row.craftTimeLabel || formatCraftTime(row.craftTimeSeconds);
+        row.categoryIcon = row.categoryIcon || "📦";
+        row.categoryLabel = row.categoryLabel || (row.wikiType ? `📦 ${row.wikiType}` : "");
+        row.componentClass = row.componentClass || "";
+        row.armorClass = row.armorClass || "";
+        row.armorSlot = row.armorSlot || "";
+        row.ammoType = row.ammoType || "";
+        row.fpsGroup = row.fpsGroup || "";
+        row.componentMetaText = row.componentMetaText || [row.componentGrade ? `Grade ${row.componentGrade}` : "", row.componentSize || "", row.componentClass || ""].filter(Boolean).join(" · ");
+        row.unlockingMissions = Array.isArray(row.unlockingMissions) ? row.unlockingMissions : [];
+        row.unlockingMissionsGrouped = Array.isArray(row.unlockingMissionsGrouped) ? row.unlockingMissionsGrouped : [];
+        row.missionDetails = Array.isArray(row.missionDetails) ? row.missionDetails : [];
+        row.missionDetailsLoaded = !!row.missionDetailsLoaded;
+        row.missionDetailsLoading = false;
+        return row;
+      });
+      state.filesScanned = Number(snapshot.filesScanned || 0);
+      state.linesScanned = Number(snapshot.linesScanned || 0);
+      state.hits = Number(snapshot.hits || state.rows.reduce((sum, r) => sum + Number(r.count || 0), 0));
+      state.sortKey = "name";
+      state.sortDir = 1;
+      els.search.value = "";
+      els.progress.style.width = "100%";
+      setStatus(`Helyi mentés betöltve: ${state.rows.length} blueprint.`, "ok");
+      log(`Helyi mentés betöltve: ${state.rows.length} blueprint${snapshot.savedAt ? " — " + new Date(snapshot.savedAt).toLocaleString("hu-HU") : ""}.`, "ok");
+      const hasSavedWikiRows = state.rows.some(r => r.wikiStatus && r.wikiStatus !== "Nincs ellenőrizve");
+      if (hasSavedWikiRows && !state.wikiBlueprints.length) {
+        setApiStatus("Mentésből visszatöltve. A Wiki keresőindex nincs eltárolva; kézi Wiki frissítés újraellenőrzi és frissíti az adatokat.", "warning");
+        log("Megjegyzés: a mentett recept/Wiki adatok visszatöltődtek, de a Wiki API keresőindex nincs localStorage-ban. Kézi Wiki frissítés esetén újra lekéri és felülírhatja az adatokat.", "warning");
+      } else if (hasSavedWikiRows) {
+        setApiStatus("Mentés betöltve. Aktív Wiki cache is van a memóriában.", "ok");
+      }
+      applyFilterAndRender();
+      updateStats();
+    } catch (err) {
+      log(`Helyi mentés betöltési hiba: ${err.message}`, "error");
+      updateStats();
+    }
+  }
+
+  function updateFilterButtons() {
+    if (!els.categoryFilters || !state.filters) return;
+    els.categoryFilters.querySelectorAll(".filter-chip[data-filter-group]").forEach(btn => {
+      const group = btn.dataset.filterGroup;
+      const value = btn.dataset.filterValue || "";
+      btn.classList.toggle("active", (state.filters[group] || "") === value);
+    });
+  }
+
+  function setFilter(group, value) {
+    if (!state.filters) state.filters = { kind: "", subType: "", grade: "", size: "", compClass: "", armorClass: "", armorSlot: "", ammoType: "", fpsGroup: "" };
+    state.filters[group] = value || "";
+
+    const shipSpecific = ["subType", "grade", "size", "compClass"];
+    const armorSpecific = ["armorClass", "armorSlot"];
+
+    if (shipSpecific.includes(group) && value) {
+      state.filters.kind = "Ship Component";
+      state.filters.fpsGroup = "";
+      state.filters.armorClass = "";
+      state.filters.armorSlot = "";
+      state.filters.ammoType = "";
+    }
+
+    if (armorSpecific.includes(group) && value) {
+      state.filters.fpsGroup = "Armour";
+      state.filters.kind = "";
+      state.filters.ammoType = "";
+      state.filters.subType = "";
+      state.filters.grade = "";
+      state.filters.size = "";
+      state.filters.compClass = "";
+    }
+
+    if (group === "ammoType" && value) {
+      state.filters.kind = "";
+      state.filters.subType = "";
+      state.filters.grade = "";
+      state.filters.size = "";
+      state.filters.compClass = "";
+    }
+
+    if (group === "kind") {
+      if (value !== "Ship Component") {
+        state.filters.subType = "";
+        state.filters.grade = "";
+        state.filters.size = "";
+        state.filters.compClass = "";
+      }
+      if (value === "Armor" || value === "Backpack") {
+        state.filters.fpsGroup = "Armour";
+      } else if (value === "FPS Weapon") {
+        state.filters.fpsGroup = "Weapons";
+      } else if (value === "FPS Magazine") {
+        state.filters.fpsGroup = "Ammo";
+      } else if (value === "Ship Component" || value === "Egyéb" || value === "") {
+        if (value !== "") state.filters.fpsGroup = "";
+      }
+    }
+
+    if (group === "fpsGroup") {
+      if (value) {
+        state.filters.kind = "";
+        state.filters.subType = "";
+        state.filters.grade = "";
+        state.filters.size = "";
+        state.filters.compClass = "";
+      }
+      if (value !== "Armour") {
+        state.filters.armorClass = "";
+        state.filters.armorSlot = "";
+      }
+      if (value !== "Ammo" && value !== "Weapons") {
+        state.filters.ammoType = "";
+      }
+    }
+
+    updateFilterButtons();
+    applyFilterAndRender();
+  }
+
+  function clearFilters() {
+    state.filters = { kind: "", subType: "", grade: "", size: "", compClass: "", armorClass: "", armorSlot: "", ammoType: "", fpsGroup: "" };
+    updateFilterButtons();
+    applyFilterAndRender();
+  }
+
+  function rowFilterText(r) {
+    return [
+      r.name, r.wikiOutputName, r.wikiType, r.categoryKind, r.categorySubType, r.categoryLabel,
+      r.componentGrade, r.componentSize, r.componentClass, r.componentMetaText,
+      r.armorClass, r.armorSlot, r.ammoType, r.fpsGroup,
+      r.materialText, r.useText, r.sourceType,
+      ...(Array.isArray(r.materials) ? r.materials.map(m => `${m.name || ""} ${m.slot || ""} ${m.use || ""}`) : []),
+      ...(Array.isArray(r.unlockingMissions) ? r.unlockingMissions.map(m => `${m.title || ""} ${m.reward_scope || ""}`) : [])
+    ].filter(Boolean).join(" ");
+  }
+
+  function inferRowFilterMeta(r) {
+    const text = rowFilterText(r);
+    const t = normalizeForMatch(text);
+    let kind = r.categoryKind || "";
+    let subType = r.categorySubType || "";
+
+    const componentSubtype = subType || detectComponentSubtype(text);
+    const looksShip = kind === "Ship Component" || !!componentSubtype;
+
+    if (!kind || kind === "Egyéb") {
+      if (looksShip) kind = "Ship Component";
+      else if (t.includes("backpack") || t.includes("rucksack")) kind = "Backpack";
+      else if (t.includes("magazine") || t.includes(" ammunition") || t.includes(" ammo")) kind = "FPS Magazine";
+      else if (t.includes("personal weapon") || t.includes("fps weapon") || t.includes("rifle") || t.includes("pistol") || t.includes("shotgun") || t.includes("smg") || t.includes("sniper") || t.includes("lmg") || t.includes("railgun")) kind = "FPS Weapon";
+      else if (t.includes("armor") || t.includes("armour") || t.includes("helmet") || t.includes("undersuit") || t.includes("torso") || t.includes("chest") || t.includes(" arms ") || t.includes(" legs ")) kind = "Armor";
+      else kind = "Egyéb";
+    }
+
+    let armorClass = r.armorClass || detectArmorClass(text);
+    let armorSlot = r.armorSlot || detectArmorSlot(text);
+    let ammoType = r.ammoType || detectAmmoType(text);
+    let fpsGroup = r.fpsGroup || "";
+
+    if (!fpsGroup) {
+      if (kind === "FPS Magazine" || t.includes("magazine") || t.includes(" ammunition") || t.includes(" ammo")) fpsGroup = "Ammo";
+      else if (kind === "FPS Weapon" || t.includes("personal weapon") || t.includes("fps weapon") || t.includes("rifle") || t.includes("pistol") || t.includes("shotgun") || t.includes("smg") || t.includes("sniper") || t.includes("lmg") || t.includes("railgun")) fpsGroup = "Weapons";
+      else if (kind === "Armor" || kind === "Backpack" || t.includes("armor") || t.includes("armour") || t.includes("helmet") || t.includes("undersuit") || t.includes("torso") || t.includes("backpack")) fpsGroup = "Armour";
+    }
+
+    return {
+      kind,
+      subType: componentSubtype,
+      grade: r.componentGrade || normalizeGrade("", text),
+      size: r.componentSize || normalizeSize("", text),
+      compClass: r.componentClass || normalizeComponentClass("", text),
+      armorClass,
+      armorSlot,
+      ammoType,
+      fpsGroup
+    };
+  }
+
+  function rowMatchesFilters(r) {
+    const f = state.filters || {};
+    const m = inferRowFilterMeta(r);
+    if (f.kind && m.kind !== f.kind) return false;
+    if (f.subType && m.subType !== f.subType) return false;
+    if (f.grade && m.grade !== f.grade) return false;
+    if (f.size && m.size !== f.size) return false;
+    if (f.compClass && m.compClass !== f.compClass) return false;
+    if (f.armorClass && m.armorClass !== f.armorClass) return false;
+    if (f.armorSlot && m.armorSlot !== f.armorSlot) return false;
+    if (f.ammoType && m.ammoType !== f.ammoType) return false;
+    if (f.fpsGroup && m.fpsGroup !== f.fpsGroup) return false;
+    return true;
+  }
+
+  function compareRows(a, b, key) {
+    let av = a[key], bv = b[key];
+    if (typeof av === "number" && typeof bv === "number") return av - bv;
+    return String(av ?? "").localeCompare(String(bv ?? ""), "hu", { sensitivity: "base", numeric: true });
+  }
+  function applyFilterAndRender() {
+    const q = els.search.value.trim().toLowerCase();
+    state.filtered = state.rows.filter(r => {
+      if (!rowMatchesFilters(r)) return false;
+      if (!q) return true;
+      return [
+        r.name, r.wikiStatus, r.wikiOutputName, r.wikiType, r.categoryKind, r.categorySubType, r.categoryLabel, r.componentGrade, r.componentSize, r.componentClass, r.componentMetaText, r.armorClass, r.armorSlot, r.ammoType, r.fpsGroup, r.materialText, r.useText, r.craftTimeLabel, r.sourceType,
+        ...(Array.isArray(r.unlockingMissions) ? r.unlockingMissions.map(m => `${m.title || ""} ${m.reward_scope || ""}`) : []),
+        ...(Array.isArray(r.missionDetails) ? r.missionDetails.map(m => `${m.title || ""} ${m.mission_giver || ""} ${m.faction || ""} ${(m.star_systems || []).join(" ")}`) : [])
+      ].join(" ").toLowerCase().includes(q);
+    });
+    state.filtered.sort((a, b) => compareRows(a, b, state.sortKey) * state.sortDir);
+    renderTable();
+  }
+  function wikiBadge(status) {
+    if (status === "Egyezés") return `<span class="pill ok">Egyezés</span>`;
+    if (status === "Részleges") return `<span class="pill warn">Részleges</span>`;
+    if (status === "Nincs találat") return `<span class="pill bad">Nincs találat</span>`;
+    return `<span class="pill">Nincs ellenőrizve</span>`;
+  }
+  function renderMaterials(materials) {
+    if (!materials || !materials.length) return `<span class="muted">-</span>`;
+    return `<div class="material-list">${materials.map(m => `
+      <div class="material-row">
+        <span class="mat-name">${escapeHtml(m.name)}</span>
+        <span class="mat-qty">${escapeHtml(m.amount || "?")}${m.minQuality !== "" ? ` · Q${escapeHtml(m.minQuality)}` : ""}</span>
+      </div>`).join("")}</div>`;
+  }
+  function renderUses(materials) {
+    if (!materials || !materials.length) return `<span class="muted">-</span>`;
+    return `<div class="use-list">${materials.map(m => `
+      <div class="use-row">
+        <span class="use-name">${escapeHtml(m.name)}</span>
+        <span class="use-target">${escapeHtml(m.use || "Alapanyag")}</span>
+      </div>`).join("")}</div>`;
+  }
+  function renderTable() {
+    const previousScrollTop = els.tableWrap.scrollTop;
+    els.tbody.innerHTML = "";
+    if (!state.filtered.length) {
+      els.tableWrap.classList.add("hidden");
+      els.empty.classList.remove("hidden");
+      els.empty.textContent = state.rows.length ? "A keresésre nincs találat." : "Válaszd ki a logbackups mappát, és itt megjelennek a megtalált blueprintjeid.";
+      return;
+    }
+    els.empty.classList.add("hidden");
+    els.tableWrap.classList.remove("hidden");
+    const frag = document.createDocumentFragment();
+    for (const r of state.filtered) {
+      const tr = document.createElement("tr");
+      if (rowKey(r) === state.selectedRowKey) tr.classList.add("selected-row");
+      tr.title = "Kattints a blueprint / quest részletek megnyitásához";
+      tr.addEventListener("click", () => selectRow(r));
+      const wikiLinks = [
+        r.wikiWebUrl ? `<a class="link" href="${escapeAttr(r.wikiWebUrl)}" target="_blank" rel="noopener">Részletek</a>` : ""
+      ].filter(Boolean).join(" · ");
+      const craft = craftTimeText(r);
+      tr.innerHTML = `
+        <td><b>${escapeHtml(r.name)}</b><div class="small-note">${escapeHtml(r.sourceType)} · ${r.count} log találat</div></td>
+        <td>${wikiBadge(r.wikiStatus)}<div class="small-note">${wikiLinks}</div>${r.wikiDetailLoaded ? `<div class="small-note ok">részletes recept betöltve</div>` : ""}</td>
+        <td>${escapeHtml(r.wikiOutputName || "-")}</td>
+        <td>${renderCategoryCell(r)}</td>
+        <td>${renderMaterials(r.materials)}</td>
+        <td>${renderUses(r.materials)}</td>
+        <td>${escapeHtml(craft)}</td>
+        <td>${escapeHtml(r.unlockingMissionsCount === "" ? "-" : r.unlockingMissionsCount)}</td>
+        <td>${r.count}</td>
+      `;
+      frag.appendChild(tr);
+    }
+    els.tbody.appendChild(frag);
+    els.tableWrap.scrollTop = previousScrollTop;
+    const selected = getSelectedRow();
+    if (selected) renderBlueprintPanel(selected);
+  }
+
+  function escapeHtml(s) { return String(s ?? "").replace(/[&<>\"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
+  function escapeAttr(s) { return escapeHtml(s).replace(/'/g, "&#39;"); }
+  function toCsv(rows) {
+    const cols = ["Blueprint Name", "Wiki Status", "Crafted Item", "Category", "Component Subtype", "Grade", "Size", "Component Class", "API Type", "Materials Required", "Used For", "Craft Time", "Unlocking Missions", "Quest Names", "Log Hit Count", "Wiki UUID", "Web URL"];
+    const esc = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const body = rows.map(r => [
+      r.name,
+      r.wikiStatus,
+      r.wikiOutputName,
+      r.categoryLabel,
+      r.categorySubType,
+      r.componentGrade,
+      r.componentSize,
+      r.componentClass,
+      r.wikiType,
+      r.materialText,
+      r.useText,
+      craftTimeText(r),
+      r.unlockingMissionsCount,
+      (Array.isArray(r.unlockingMissions) ? r.unlockingMissions.map(m => m.title || m.debug_name || "").filter(Boolean).join("; ") : ""),
+      r.count,
+      r.wikiUuid,
+      r.wikiWebUrl
+    ].map(esc).join(","));
+    return [cols.map(esc).join(","), ...body].join("\r\n");
+  }
+  function downloadText(filename, text, mime) {
+    const blob = new Blob([text], { type: mime + ";charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+  function stamp() {
+    const d = new Date();
+    const pad = n => String(n).padStart(2, "0");
+    return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`;
+  }
+
+  els.pickFolderBtn.addEventListener("click", async () => {
+    if (!window.showDirectoryPicker) {
+      log("A böngésződ nem támogatja a showDirectoryPicker API-t. Használd a fallback tallózást.", "warning");
+      els.folderInput.click();
+      return;
+    }
+    try {
+      const handle = await window.showDirectoryPicker({ mode: "read" });
+      const files = await collectFilesFromDirectoryHandle(handle);
+      await scanFiles(files);
+    } catch (err) {
+      if (err && err.name === "AbortError") return;
+      log(`Mappaválasztási hiba: ${err.message}`, "error");
+      setBusy(false);
+    }
+  });
+  els.folderInput.addEventListener("change", async () => {
+    const files = collectFilesFromInput(els.folderInput.files);
+    await scanFiles(files);
+    els.folderInput.value = "";
+  });
+  els.clearBtn.addEventListener("click", () => {
+    if (state.isBusy || state.apiBusy) {
+      log("Futó beolvasás vagy API lekérés közben nem ürítem a listát.", "warning");
+      return;
+    }
+    resetAll();
+    log("Lista ürítve. A gépen lévő logfájlokhoz nem nyúltam.", "ok");
+  });
+  els.search.addEventListener("input", applyFilterAndRender);
+  if (els.categoryFilters) {
+    els.categoryFilters.addEventListener("click", (ev) => {
+      const btn = ev.target.closest(".filter-chip[data-filter-group]");
+      if (!btn) return;
+      setFilter(btn.dataset.filterGroup, btn.dataset.filterValue || "");
+    });
+  }
+  if (els.clearFiltersBtn) els.clearFiltersBtn.addEventListener("click", clearFilters);
+  els.syncWikiBtn.addEventListener("click", () => syncWikiDatabase({ auto: false }));
+  els.fetchDetailsBtn.addEventListener("click", () => fetchDetailsForMatchedRows({ force: true }));
+  els.lookupMissingBtn.addEventListener("click", lookupMissingDirectly);
+  if (els.fetchMissionDetailsBtn) els.fetchMissionDetailsBtn.addEventListener("click", () => loadMissionDetailsForRow(getSelectedRow(), { silent: false }));
+  if (els.closeBpDetailBtn) els.closeBpDetailBtn.addEventListener("click", closeBlueprintPanel);
+  els.autoWiki.addEventListener("change", () => {
+    setApiStatus(els.autoWiki.checked ? "Automatikus Wiki ellenőrzés bekapcsolva." : "Automatikus Wiki ellenőrzés kikapcsolva. Kézzel indítható.", els.autoWiki.checked ? "ok" : "warning");
+  });
+  document.querySelectorAll("th[data-sort]").forEach(th => {
+    th.addEventListener("click", () => {
+      const key = th.dataset.sort;
+      if (state.sortKey === key) state.sortDir *= -1;
+      else { state.sortKey = key; state.sortDir = 1; }
+      applyFilterAndRender();
+    });
+  });
+  els.copyBtn.addEventListener("click", async () => {
+    const text = state.filtered.map(r => `${r.name}${r.categoryLabel ? " — " + r.categoryLabel : ""}${r.componentMetaText ? " — " + r.componentMetaText : ""}${r.materialText ? " — " + r.materialText : ""}`).join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      log(`${state.filtered.length} blueprint + anyaglista vágólapra másolva.`, "ok");
+    } catch {
+      downloadText(`sc_blueprints_materials_${stamp()}.txt`, text, "text/plain");
+      log("A vágólap nem volt elérhető, ezért TXT-ként letöltöttem.", "warning");
+    }
+  });
+  els.csvBtn.addEventListener("click", () => downloadText(`sc_blueprints_materials_${stamp()}.csv`, toCsv(state.filtered), "text/csv"));
+  els.jsonBtn.addEventListener("click", () => {
+    const clean = state.filtered.map(r => ({
+      name: r.name,
+      count: r.count,
+      sourceType: r.sourceType,
+      wiki: {
+        status: r.wikiStatus,
+        outputName: r.wikiOutputName,
+        type: r.wikiType,
+        category: {
+          kind: r.categoryKind,
+          subType: r.categorySubType,
+          label: r.categoryLabel,
+          grade: r.componentGrade,
+          size: r.componentSize,
+          componentClass: r.componentClass,
+          meta: r.componentMetaText
+        },
+        uuid: r.wikiUuid,
+        apiUrl: r.wikiUrl,
+        webUrl: r.wikiWebUrl,
+        craftTimeSeconds: r.craftTimeSeconds,
+        craftTimeLabel: r.craftTimeLabel,
+        unlockingMissionsCount: r.unlockingMissionsCount,
+        isAvailableByDefault: r.isAvailableByDefault,
+        detailLoaded: r.wikiDetailLoaded,
+        materials: r.materials,
+        unlockingMissions: r.unlockingMissions || [],
+        missionDetails: r.missionDetails || []
+      }
+    }));
+    downloadText(`sc_blueprints_materials_${stamp()}.json`, JSON.stringify(clean, null, 2), "application/json");
+  });
+
+  els.saveLocalBtn.addEventListener("click", saveLocalSnapshot);
+  els.loadLocalBtn.addEventListener("click", loadLocalSnapshot);
+  els.copyLogBtn.addEventListener("click", async () => {
+    const text = Array.from(els.runLog.children).map(x => x.textContent).join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      log("Napló vágólapra másolva.", "ok");
+    } catch {
+      downloadText(`sc_blueprint_extractor_log_${stamp()}.txt`, text, "text/plain");
+      log("A vágólap nem volt elérhető, ezért a naplót TXT-ként letöltöttem.", "warning");
+    }
+  });
+
+  updateFilterButtons();
+  updateStats();
+})();
+</script>
+</body>
+</html>
