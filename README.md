@@ -1,0 +1,1 @@
+# sPg-Blueprint-Extractor-Recept-anyagok
